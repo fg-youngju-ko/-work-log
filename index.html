@@ -418,6 +418,22 @@
     font-size: 12.5px;
     padding: 7px 14px;
   }
+  .io-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .io-row button {
+    background: var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 6px 12px;
+  }
+  .io-status {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
 </style>
 </head>
 <body>
@@ -426,6 +442,13 @@
     <h1>📝 업무일지</h1>
     <span class="count" id="entryCount"></span>
   </header>
+
+  <div class="io-row">
+    <button type="button" id="exportBtn">⬇ 내보내기</button>
+    <button type="button" id="importBtn">⬆ 가져오기</button>
+    <input type="file" id="importFile" accept="application/json" class="hidden">
+    <span class="io-status" id="ioStatus"></span>
+  </div>
 
   <section class="todo-card" id="todoSection">
     <div class="todo-header">
@@ -519,6 +542,11 @@
   const searchInput = document.getElementById('searchInput');
   const searchDateInput = document.getElementById('searchDateInput');
   const resetSearchBtn = document.getElementById('resetSearchBtn');
+
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const importFile = document.getElementById('importFile');
+  const ioStatus = document.getElementById('ioStatus');
 
   let editingId = null;
   let pipWindow = null;
@@ -1066,6 +1094,73 @@
       bindDeleteConfirm(card.querySelector('.delete-btn'), () => deleteEntry(id));
     });
   }
+
+  // ---- 가져오기/내보내기 ----
+
+  function showIoStatus(msg) {
+    ioStatus.textContent = msg;
+    clearTimeout(showIoStatus._timer);
+    showIoStatus._timer = setTimeout(() => { ioStatus.textContent = ''; }, 4000);
+  }
+
+  exportBtn.addEventListener('click', () => {
+    const data = {
+      entries: loadEntries(),
+      todos: loadTodos(),
+      categories: loadCategories(),
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `업무일지_백업_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showIoStatus('내보내기 완료');
+  });
+
+  importBtn.addEventListener('click', () => importFile.click());
+
+  importFile.addEventListener('change', () => {
+    const file = importFile.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        let addedEntries = 0;
+        let addedTodos = 0;
+
+        if (Array.isArray(data.entries)) {
+          const existing = loadEntries();
+          const existingIds = new Set(existing.map((e) => e.id));
+          const incoming = data.entries.filter((e) => !existingIds.has(e.id));
+          saveEntries([...existing, ...incoming]);
+          addedEntries = incoming.length;
+        }
+        if (Array.isArray(data.todos)) {
+          const existing = loadTodos();
+          const existingIds = new Set(existing.map((t) => t.id));
+          const incoming = data.todos.filter((t) => !existingIds.has(t.id));
+          saveTodos([...existing, ...incoming]);
+          addedTodos = incoming.length;
+        }
+        if (Array.isArray(data.categories) && data.categories.length) {
+          saveCategories(Array.from(new Set([...loadCategories(), ...data.categories])));
+        }
+
+        renderCategorySelect();
+        render();
+        renderTodos();
+        showIoStatus(`가져오기 완료 (업무일지 ${addedEntries}건, TODO ${addedTodos}건 추가)`);
+      } catch {
+        showIoStatus('가져오기 실패: JSON 파일 형식을 확인해주세요.');
+      }
+      importFile.value = '';
+    };
+    reader.readAsText(file);
+  });
 
   migrateCompletedTodos();
   resetForm();
