@@ -249,10 +249,6 @@
     font-size: 14px;
     word-break: break-word;
   }
-  .todo-item.done .todo-text {
-    text-decoration: line-through;
-    color: var(--text-muted);
-  }
   .todo-item .todo-meta {
     font-size: 11px;
     color: var(--text-muted);
@@ -712,6 +708,30 @@
     }
   }
 
+  // 이전 버전(체크 시 목록에 남아있던 방식)에서 완료 표시된 TODO가 있다면
+  // 업무일지 항목으로 옮기고 TODO 목록에서 제거한다. 1회성 이관.
+  function migrateCompletedTodos() {
+    const todos = loadTodos();
+    const completed = todos.filter((t) => t.done);
+    if (!completed.length) return;
+
+    const entries = loadEntries();
+    completed.forEach((t) => {
+      const stamp = t.completedAt || t.createdAt || new Date().toISOString();
+      entries.push({
+        id: crypto.randomUUID(),
+        content: t.text,
+        start: stamp,
+        end: null,
+        category: null,
+        createdAt: stamp,
+        updatedAt: stamp,
+      });
+    });
+    saveEntries(entries);
+    saveTodos(todos.filter((t) => !t.done));
+  }
+
   function saveTodos(todos) {
     localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
   }
@@ -727,8 +747,6 @@
       id: crypto.randomUUID(),
       text,
       createdAt: new Date().toISOString(),
-      done: false,
-      completedAt: null,
     });
     saveTodos(todos);
     todoInput.value = '';
@@ -736,14 +754,28 @@
     renderTodos();
   }
 
-  function toggleTodo(id) {
-    const todos = loadTodos().map((t) => {
-      if (t.id !== id) return t;
-      const done = !t.done;
-      return { ...t, done, completedAt: done ? new Date().toISOString() : null };
+  // 체크 완료 시 TODO 목록에서 사라지고, 수기 작성과 동일한 업무일지 항목으로 전환된다.
+  function completeTodo(id) {
+    const todos = loadTodos();
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) return;
+
+    const nowIso = new Date().toISOString();
+    const entries = loadEntries();
+    entries.push({
+      id: crypto.randomUUID(),
+      content: todo.text,
+      start: nowIso,
+      end: null,
+      category: null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
     });
-    saveTodos(todos);
+    saveEntries(entries);
+    saveTodos(todos.filter((t) => t.id !== id));
+
     renderTodos();
+    render();
   }
 
   function deleteTodo(id) {
@@ -752,37 +784,31 @@
   }
 
   function renderTodos() {
-    const todos = loadTodos();
-    const pending = todos.filter((t) => !t.done).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    const done = todos.filter((t) => t.done).sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
-    const ordered = [...pending, ...done];
+    const todos = loadTodos().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-    if (!ordered.length) {
+    if (!todos.length) {
       todoList.innerHTML = '<li class="todo-empty">할 일이 없습니다.</li>';
       return;
     }
 
-    todoList.innerHTML = ordered.map((t) => {
-      const meta = t.done
-        ? `생성 ${formatKoreanShort(t.createdAt)} · 완료 ${formatKoreanShort(t.completedAt)}`
-        : `생성 ${formatKoreanShort(t.createdAt)}`;
-      return `
-        <li class="todo-item ${t.done ? 'done' : ''}" data-id="${t.id}">
-          <input type="checkbox" class="todo-check" ${t.done ? 'checked' : ''}>
-          <div class="todo-body">
-            <div class="todo-text"></div>
-            <div class="todo-meta">${meta}</div>
-          </div>
-          <button class="icon-btn danger delete-btn">삭제</button>
-        </li>
-      `;
-    }).join('');
+    todoList.innerHTML = todos.map((t) => `
+      <li class="todo-item" data-id="${t.id}">
+        <input type="checkbox" class="todo-check">
+        <div class="todo-body">
+          <div class="todo-text"></div>
+          <div class="todo-meta">생성 ${formatKoreanShort(t.createdAt)}</div>
+        </div>
+        <button class="icon-btn danger delete-btn">삭제</button>
+      </li>
+    `).join('');
 
     todoList.querySelectorAll('.todo-item').forEach((li) => {
       const id = li.getAttribute('data-id');
-      const todo = ordered.find((t) => t.id === id);
+      const todo = todos.find((t) => t.id === id);
       li.querySelector('.todo-text').textContent = todo.text;
-      li.querySelector('.todo-check').addEventListener('change', () => toggleTodo(id));
+      li.querySelector('.todo-check').addEventListener('change', (e) => {
+        if (e.target.checked) completeTodo(id);
+      });
       bindDeleteConfirm(li.querySelector('.delete-btn'), () => deleteTodo(id));
     });
   }
@@ -966,6 +992,7 @@
     });
   }
 
+  migrateCompletedTodos();
   resetForm();
   render();
   renderTodos();
