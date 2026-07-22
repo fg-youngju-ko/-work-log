@@ -169,6 +169,7 @@
   }
   .icon-btn:hover { background: var(--border); opacity: 1; }
   .icon-btn.danger { color: var(--danger); }
+  .icon-btn.confirming { background: var(--danger); color: #fff; }
   .empty-state {
     text-align: center;
     color: var(--text-muted);
@@ -511,6 +512,26 @@
     return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
+  // 네이티브 confirm()은 일부 미리보기 환경(샌드박스 iframe)에서 차단될 수 있어
+  // "한 번 더 누르면 삭제" 방식의 자체 확인으로 대체.
+  function bindDeleteConfirm(btn, onConfirm) {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.confirming === '1') {
+        onConfirm();
+        return;
+      }
+      btn.dataset.confirming = '1';
+      const original = btn.textContent;
+      btn.textContent = '정말 삭제?';
+      btn.classList.add('confirming');
+      setTimeout(() => {
+        btn.dataset.confirming = '0';
+        btn.textContent = original;
+        btn.classList.remove('confirming');
+      }, 2500);
+    });
+  }
+
   // ---- 카테고리 ----
 
   function loadCategories() {
@@ -587,7 +608,6 @@
   }
 
   function removeCategory(name) {
-    if (!confirm(`'${name}' 카테고리를 삭제할까요? 이미 저장된 항목의 분류는 그대로 유지됩니다.`)) return;
     saveCategories(loadCategories().filter((c) => c !== name));
     renderCategoryChips();
     renderCategorySelect();
@@ -727,7 +747,6 @@
   }
 
   function deleteTodo(id) {
-    if (!confirm('이 할 일을 삭제할까요?')) return;
     saveTodos(loadTodos().filter((t) => t.id !== id));
     renderTodos();
   }
@@ -764,7 +783,7 @@
       const todo = ordered.find((t) => t.id === id);
       li.querySelector('.todo-text').textContent = todo.text;
       li.querySelector('.todo-check').addEventListener('change', () => toggleTodo(id));
-      li.querySelector('.delete-btn').addEventListener('click', () => deleteTodo(id));
+      bindDeleteConfirm(li.querySelector('.delete-btn'), () => deleteTodo(id));
     });
   }
 
@@ -900,7 +919,6 @@
   }
 
   function deleteEntry(id) {
-    if (!confirm('이 항목을 삭제할까요?')) return;
     const entries = loadEntries().filter((e) => e.id !== id);
     saveEntries(entries);
     if (editingId === id) resetForm();
@@ -944,7 +962,7 @@
       card.querySelector('.entry-content').textContent = entry.content;
       card.querySelector('.category-tag').textContent = entry.category || '미분류';
       card.querySelector('.edit-btn').addEventListener('click', () => startEdit(entry));
-      card.querySelector('.delete-btn').addEventListener('click', () => deleteEntry(id));
+      bindDeleteConfirm(card.querySelector('.delete-btn'), () => deleteEntry(id));
     });
   }
 
