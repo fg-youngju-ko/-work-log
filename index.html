@@ -175,6 +175,102 @@
     padding: 60px 0;
     font-size: 14px;
   }
+  .todo-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+  }
+  .todo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .todo-header h2 {
+    font-size: 15px;
+    margin: 0;
+  }
+  #pipBtn {
+    background: var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 6px 12px;
+  }
+  .todo-hint {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+  .todo-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  #todoInput {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    background: transparent;
+    color: var(--text);
+  }
+  #todoInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #todoAddBtn { background: var(--accent); color: #1f2328; padding: 8px 16px; }
+  .todo-list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .todo-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 8px;
+  }
+  .todo-item:hover { background: var(--bg); }
+  .todo-item input[type="checkbox"] {
+    margin-top: 3px;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+  .todo-item .todo-body { flex: 1; min-width: 0; }
+  .todo-item .todo-text {
+    font-size: 14px;
+    word-break: break-word;
+  }
+  .todo-item.done .todo-text {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+  .todo-item .todo-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .todo-item .delete-btn {
+    flex-shrink: 0;
+  }
+  .todo-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 16px 0;
+  }
+  .todo-placeholder {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -183,6 +279,20 @@
     <h1>📝 업무일지</h1>
     <span class="count" id="entryCount"></span>
   </header>
+
+  <section class="todo-card" id="todoSection">
+    <div class="todo-header">
+      <h2>✅ TODO</h2>
+      <button id="pipBtn">📌 항상 위 고정</button>
+    </div>
+    <div class="todo-input-row">
+      <input type="text" id="todoInput" placeholder="할 일을 입력하세요">
+      <button id="todoAddBtn">추가</button>
+    </div>
+    <ul class="todo-list" id="todoList"></ul>
+    <div class="todo-hint" id="pipHint"></div>
+  </section>
+  <div class="todo-placeholder hidden" id="todoPlaceholder">📌 TODO 목록이 고정 창에 표시되고 있습니다.</div>
 
   <section class="form-card">
     <textarea id="contentInput" placeholder="오늘 한 업무를 입력하세요..."></textarea>
@@ -203,6 +313,7 @@
 <script>
 (function () {
   const STORAGE_KEY = 'workLog.entries';
+  const TODO_STORAGE_KEY = 'workLog.todos';
 
   const contentInput = document.getElementById('contentInput');
   const startInput = document.getElementById('startInput');
@@ -214,7 +325,16 @@
   const entryList = document.getElementById('entryList');
   const entryCount = document.getElementById('entryCount');
 
+  const todoSection = document.getElementById('todoSection');
+  const todoPlaceholder = document.getElementById('todoPlaceholder');
+  const todoInput = document.getElementById('todoInput');
+  const todoAddBtn = document.getElementById('todoAddBtn');
+  const todoList = document.getElementById('todoList');
+  const pipBtn = document.getElementById('pipBtn');
+  const pipHint = document.getElementById('pipHint');
+
   let editingId = null;
+  let pipWindow = null;
 
   function loadEntries() {
     try {
@@ -238,6 +358,150 @@
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}년 ${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
+
+  function formatKoreanShort(isoString) {
+    const d = new Date(isoString);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // ---- TODO ----
+
+  function loadTodos() {
+    try {
+      return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveTodos(todos) {
+    localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+  }
+
+  function addTodo() {
+    const text = todoInput.value.trim();
+    if (!text) {
+      todoInput.focus();
+      return;
+    }
+    const todos = loadTodos();
+    todos.push({
+      id: crypto.randomUUID(),
+      text,
+      createdAt: new Date().toISOString(),
+      done: false,
+      completedAt: null,
+    });
+    saveTodos(todos);
+    todoInput.value = '';
+    todoInput.focus();
+    renderTodos();
+  }
+
+  function toggleTodo(id) {
+    const todos = loadTodos().map((t) => {
+      if (t.id !== id) return t;
+      const done = !t.done;
+      return { ...t, done, completedAt: done ? new Date().toISOString() : null };
+    });
+    saveTodos(todos);
+    renderTodos();
+  }
+
+  function deleteTodo(id) {
+    if (!confirm('이 할 일을 삭제할까요?')) return;
+    saveTodos(loadTodos().filter((t) => t.id !== id));
+    renderTodos();
+  }
+
+  function renderTodos() {
+    const todos = loadTodos();
+    const pending = todos.filter((t) => !t.done).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const done = todos.filter((t) => t.done).sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+    const ordered = [...pending, ...done];
+
+    if (!ordered.length) {
+      todoList.innerHTML = '<li class="todo-empty">할 일이 없습니다.</li>';
+      return;
+    }
+
+    todoList.innerHTML = ordered.map((t) => {
+      const meta = t.done
+        ? `생성 ${formatKoreanShort(t.createdAt)} · 완료 ${formatKoreanShort(t.completedAt)}`
+        : `생성 ${formatKoreanShort(t.createdAt)}`;
+      return `
+        <li class="todo-item ${t.done ? 'done' : ''}" data-id="${t.id}">
+          <input type="checkbox" class="todo-check" ${t.done ? 'checked' : ''}>
+          <div class="todo-body">
+            <div class="todo-text"></div>
+            <div class="todo-meta">${meta}</div>
+          </div>
+          <button class="icon-btn danger delete-btn">삭제</button>
+        </li>
+      `;
+    }).join('');
+
+    todoList.querySelectorAll('.todo-item').forEach((li) => {
+      const id = li.getAttribute('data-id');
+      const todo = ordered.find((t) => t.id === id);
+      li.querySelector('.todo-text').textContent = todo.text;
+      li.querySelector('.todo-check').addEventListener('change', () => toggleTodo(id));
+      li.querySelector('.delete-btn').addEventListener('click', () => deleteTodo(id));
+    });
+  }
+
+  todoAddBtn.addEventListener('click', addTodo);
+  todoInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addTodo();
+  });
+
+  // ---- 항상 위 고정 (Document Picture-in-Picture) ----
+
+  if (!('documentPictureInPicture' in window)) {
+    pipHint.textContent = '※ 항상 위 고정은 Chrome/Edge 최신 버전에서만 지원됩니다.';
+  }
+
+  async function openPip() {
+    if (!('documentPictureInPicture' in window)) {
+      alert('이 브라우저는 항상 위 고정 기능을 지원하지 않습니다. Chrome 또는 Edge 최신 버전에서 사용해 주세요.');
+      return;
+    }
+    pipWindow = await documentPictureInPicture.requestWindow({ width: 320, height: 420 });
+
+    [...document.styleSheets].forEach((styleSheet) => {
+      try {
+        const css = [...styleSheet.cssRules].map((r) => r.cssText).join('');
+        const style = document.createElement('style');
+        style.textContent = css;
+        pipWindow.document.head.appendChild(style);
+      } catch {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = styleSheet.type;
+        link.media = styleSheet.media;
+        link.href = styleSheet.href;
+        pipWindow.document.head.appendChild(link);
+      }
+    });
+    pipWindow.document.body.style.margin = '12px';
+    pipWindow.document.body.appendChild(todoSection);
+    todoPlaceholder.classList.remove('hidden');
+
+    pipBtn.textContent = '✕ 고정 해제';
+    pipBtn.onclick = () => pipWindow.close();
+
+    pipWindow.addEventListener('pagehide', () => {
+      todoPlaceholder.classList.add('hidden');
+      todoPlaceholder.insertAdjacentElement('beforebegin', todoSection);
+      pipBtn.textContent = '📌 항상 위 고정';
+      pipBtn.onclick = openPip;
+      pipWindow = null;
+      renderTodos();
+    }, { once: true });
+  }
+
+  pipBtn.addEventListener('click', openPip);
 
   function resetForm() {
     contentInput.value = '';
@@ -360,6 +624,7 @@
 
   resetForm();
   render();
+  renderTodos();
 })();
 </script>
 </body>
