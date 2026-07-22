@@ -271,6 +271,122 @@
     color: var(--text-muted);
     font-size: 13px;
   }
+  .category-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .category-row label { display: flex; align-items: center; gap: 6px; }
+  #categoryInput {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .category-manage-btn {
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 4px 2px;
+    text-decoration: underline;
+  }
+  .category-panel {
+    margin-top: 10px;
+    padding: 12px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+  }
+  .category-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .category-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 6px 4px 12px;
+    font-size: 12.5px;
+  }
+  .category-chip button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .category-add-row { display: flex; gap: 6px; }
+  .category-add-row input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: transparent;
+    color: var(--text);
+  }
+  .category-add-row button { padding: 6px 14px; font-size: 12.5px; background: var(--accent); color: #1f2328; }
+  .meta-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .category-tag {
+    background: var(--border);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .summary-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+  }
+  .summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  .summary-header h2 { font-size: 15px; margin: 0; }
+  .summary-range { font-size: 12px; color: var(--text-muted); }
+  .summary-group { margin-bottom: 14px; }
+  .summary-group:last-child { margin-bottom: 0; }
+  .summary-group-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .summary-group-title .count { font-weight: 500; color: var(--text-muted); font-size: 12px; }
+  .summary-item {
+    font-size: 13px;
+    color: var(--text);
+    padding: 4px 0 4px 10px;
+    border-left: 2px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .summary-item .summary-time { color: var(--text-muted); font-size: 11.5px; margin-right: 6px; }
+  .summary-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 16px 0;
+  }
 </style>
 </head>
 <body>
@@ -301,10 +417,29 @@
       <label><input type="checkbox" id="rangeToggle"> 기간으로 설정</label>
       <label id="endLabel" class="hidden">종료 <input type="datetime-local" id="endInput"></label>
     </div>
+    <div class="category-row">
+      <label>카테고리 <select id="categoryInput"></select></label>
+      <button type="button" class="category-manage-btn" id="categoryManageBtn">카테고리 관리</button>
+    </div>
+    <div class="category-panel hidden" id="categoryPanel">
+      <div class="category-chip-list" id="categoryChipList"></div>
+      <div class="category-add-row">
+        <input type="text" id="newCategoryInput" placeholder="새 카테고리 이름">
+        <button type="button" id="addCategoryBtn">추가</button>
+      </div>
+    </div>
     <div class="actions">
       <button id="cancelEditBtn" class="hidden">취소</button>
       <button id="saveBtn">저장</button>
     </div>
+  </section>
+
+  <section class="summary-card" id="summarySection">
+    <div class="summary-header">
+      <h2>📅 이번 주 요약</h2>
+      <span class="summary-range" id="summaryRange"></span>
+    </div>
+    <div id="summaryBody"></div>
   </section>
 
   <section class="entry-list" id="entryList"></section>
@@ -314,6 +449,8 @@
 (function () {
   const STORAGE_KEY = 'workLog.entries';
   const TODO_STORAGE_KEY = 'workLog.todos';
+  const CATEGORY_STORAGE_KEY = 'workLog.categories';
+  const DEFAULT_CATEGORIES = ['회의', '개발', '문서·보고', '고객대응', '기타'];
 
   const contentInput = document.getElementById('contentInput');
   const startInput = document.getElementById('startInput');
@@ -332,6 +469,15 @@
   const todoList = document.getElementById('todoList');
   const pipBtn = document.getElementById('pipBtn');
   const pipHint = document.getElementById('pipHint');
+
+  const categoryInput = document.getElementById('categoryInput');
+  const categoryManageBtn = document.getElementById('categoryManageBtn');
+  const categoryPanel = document.getElementById('categoryPanel');
+  const categoryChipList = document.getElementById('categoryChipList');
+  const newCategoryInput = document.getElementById('newCategoryInput');
+  const addCategoryBtn = document.getElementById('addCategoryBtn');
+  const summaryRange = document.getElementById('summaryRange');
+  const summaryBody = document.getElementById('summaryBody');
 
   let editingId = null;
   let pipWindow = null;
@@ -363,6 +509,177 @@
     const d = new Date(isoString);
     const pad = (n) => String(n).padStart(2, '0');
     return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // ---- 카테고리 ----
+
+  function loadCategories() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
+      if (Array.isArray(stored)) return stored;
+    } catch {}
+    saveCategories(DEFAULT_CATEGORIES);
+    return [...DEFAULT_CATEGORIES];
+  }
+
+  function saveCategories(categories) {
+    localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+  }
+
+  function renderCategorySelect(selectedValue) {
+    const categories = loadCategories();
+    const current = selectedValue !== undefined ? selectedValue : categoryInput.value;
+    categoryInput.innerHTML = '';
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = '미분류';
+    categoryInput.appendChild(noneOpt);
+    categories.forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      categoryInput.appendChild(opt);
+    });
+    categoryInput.value = categories.includes(current) ? current : '';
+  }
+
+  function renderCategoryChips() {
+    const categories = loadCategories();
+    categoryChipList.innerHTML = '';
+    if (!categories.length) {
+      const empty = document.createElement('span');
+      empty.className = 'summary-empty';
+      empty.style.padding = '0';
+      empty.textContent = '등록된 카테고리가 없습니다.';
+      categoryChipList.appendChild(empty);
+      return;
+    }
+    categories.forEach((c) => {
+      const chip = document.createElement('span');
+      chip.className = 'category-chip';
+      const label = document.createElement('span');
+      label.textContent = c;
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', () => removeCategory(c));
+      chip.appendChild(label);
+      chip.appendChild(removeBtn);
+      categoryChipList.appendChild(chip);
+    });
+  }
+
+  function addCategory() {
+    const name = newCategoryInput.value.trim();
+    if (!name) {
+      newCategoryInput.focus();
+      return;
+    }
+    const categories = loadCategories();
+    if (!categories.includes(name)) {
+      categories.push(name);
+      saveCategories(categories);
+    }
+    newCategoryInput.value = '';
+    renderCategoryChips();
+    renderCategorySelect();
+    newCategoryInput.focus();
+  }
+
+  function removeCategory(name) {
+    if (!confirm(`'${name}' 카테고리를 삭제할까요? 이미 저장된 항목의 분류는 그대로 유지됩니다.`)) return;
+    saveCategories(loadCategories().filter((c) => c !== name));
+    renderCategoryChips();
+    renderCategorySelect();
+  }
+
+  categoryManageBtn.addEventListener('click', () => {
+    categoryPanel.classList.toggle('hidden');
+    if (!categoryPanel.classList.contains('hidden')) renderCategoryChips();
+  });
+  addCategoryBtn.addEventListener('click', addCategory);
+  newCategoryInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addCategory();
+  });
+
+  // ---- 주간 요약 ----
+
+  function getWeekRange(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const start = new Date(d);
+    start.setDate(d.getDate() + diffToMonday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
+  function formatDateShort(d) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}년 ${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일`;
+  }
+
+  function renderSummary() {
+    const { start, end } = getWeekRange(new Date());
+    summaryRange.textContent = `${formatDateShort(start)} ~ ${formatDateShort(end)}`;
+
+    const entries = loadEntries().filter((e) => {
+      const t = new Date(e.start).getTime();
+      return t >= start.getTime() && t <= end.getTime();
+    });
+
+    summaryBody.innerHTML = '';
+
+    if (!entries.length) {
+      const empty = document.createElement('div');
+      empty.className = 'summary-empty';
+      empty.textContent = '이번 주에 작성된 업무일지가 없습니다.';
+      summaryBody.appendChild(empty);
+      return;
+    }
+
+    const groups = {};
+    entries.forEach((e) => {
+      const key = e.category || '미분류';
+      (groups[key] = groups[key] || []).push(e);
+    });
+
+    Object.keys(groups)
+      .sort((a, b) => groups[b].length - groups[a].length)
+      .forEach((key) => {
+        const items = groups[key].sort((a, b) => new Date(a.start) - new Date(b.start));
+
+        const groupEl = document.createElement('div');
+        groupEl.className = 'summary-group';
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'summary-group-title';
+        titleEl.textContent = key + ' ';
+        const countEl = document.createElement('span');
+        countEl.className = 'count';
+        countEl.textContent = `${items.length}건`;
+        titleEl.appendChild(countEl);
+        groupEl.appendChild(titleEl);
+
+        items.forEach((e) => {
+          const itemEl = document.createElement('div');
+          itemEl.className = 'summary-item';
+          const timeEl = document.createElement('span');
+          timeEl.className = 'summary-time';
+          timeEl.textContent = formatKoreanShort(e.start);
+          const textEl = document.createElement('span');
+          textEl.className = 'summary-text';
+          textEl.textContent = e.content;
+          itemEl.appendChild(timeEl);
+          itemEl.appendChild(textEl);
+          groupEl.appendChild(itemEl);
+        });
+
+        summaryBody.appendChild(groupEl);
+      });
   }
 
   // ---- TODO ----
@@ -509,6 +826,7 @@
     rangeToggle.checked = false;
     endLabel.classList.add('hidden');
     endInput.value = '';
+    renderCategorySelect('');
     editingId = null;
     saveBtn.textContent = '저장';
     cancelEditBtn.classList.add('hidden');
@@ -533,13 +851,14 @@
 
     const start = new Date(startInput.value).toISOString();
     const end = rangeToggle.checked && endInput.value ? new Date(endInput.value).toISOString() : null;
+    const category = categoryInput.value || null;
     const nowIso = new Date().toISOString();
 
     let entries = loadEntries();
 
     if (editingId) {
       entries = entries.map((e) =>
-        e.id === editingId ? { ...e, content, start, end, updatedAt: nowIso } : e
+        e.id === editingId ? { ...e, content, start, end, category, updatedAt: nowIso } : e
       );
     } else {
       entries.push({
@@ -547,6 +866,7 @@
         content,
         start,
         end,
+        category,
         createdAt: nowIso,
         updatedAt: nowIso,
       });
@@ -572,6 +892,7 @@
       endLabel.classList.add('hidden');
       endInput.value = '';
     }
+    renderCategorySelect(entry.category || '');
     saveBtn.textContent = '수정 완료';
     cancelEditBtn.classList.remove('hidden');
     contentInput.focus();
@@ -589,6 +910,7 @@
   function render() {
     const entries = loadEntries().sort((a, b) => new Date(b.start) - new Date(a.start));
     entryCount.textContent = entries.length ? `총 ${entries.length}건` : '';
+    renderSummary();
 
     if (!entries.length) {
       entryList.innerHTML = '<div class="empty-state">아직 작성된 업무일지가 없습니다.</div>';
@@ -602,7 +924,10 @@
       return `
         <div class="entry-card" data-id="${e.id}">
           <div class="entry-meta">
-            <span class="stamp">${stamp}</span>
+            <span class="meta-left">
+              <span class="stamp">${stamp}</span>
+              <span class="category-tag"></span>
+            </span>
             <span class="entry-actions">
               <button class="icon-btn edit-btn">수정</button>
               <button class="icon-btn danger delete-btn">삭제</button>
@@ -617,6 +942,7 @@
       const id = card.getAttribute('data-id');
       const entry = entries.find((e) => e.id === id);
       card.querySelector('.entry-content').textContent = entry.content;
+      card.querySelector('.category-tag').textContent = entry.category || '미분류';
       card.querySelector('.edit-btn').addEventListener('click', () => startEdit(entry));
       card.querySelector('.delete-btn').addEventListener('click', () => deleteEntry(id));
     });
