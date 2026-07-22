@@ -245,10 +245,69 @@
     accent-color: var(--accent);
   }
   .todo-item .todo-body { flex: 1; min-width: 0; }
+  .todo-text-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
   .todo-item .todo-text {
     font-size: 14px;
     word-break: break-word;
   }
+  .memo-trigger {
+    position: relative;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 1px 7px;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    white-space: nowrap;
+  }
+  .memo-trigger:hover { background: var(--bg); }
+  .memo-popup {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 10px 12px;
+    width: max-content;
+    max-width: 260px;
+    white-space: pre-wrap;
+    font-size: 12.5px;
+    color: var(--text);
+    z-index: 20;
+    cursor: default;
+  }
+  .memo-trigger:hover .memo-popup { display: block; }
+  .memo-edit { margin-top: 8px; }
+  .memo-edit textarea {
+    width: 100%;
+    min-height: 60px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: transparent;
+    color: var(--text);
+    resize: vertical;
+  }
+  .memo-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .memo-edit-actions button { padding: 5px 12px; font-size: 12px; }
+  .memo-save-btn { background: var(--accent); color: #1f2328; }
+  .memo-cancel-btn { background: var(--border); color: var(--text); }
   .todo-item .todo-meta {
     font-size: 11px;
     color: var(--text-muted);
@@ -792,7 +851,7 @@
       const stamp = t.completedAt || t.createdAt || new Date().toISOString();
       entries.push({
         id: crypto.randomUUID(),
-        content: t.text,
+        content: t.memo ? `${t.text}\n\n${t.memo}` : t.text,
         start: stamp,
         end: null,
         category: null,
@@ -818,6 +877,7 @@
     todos.push({
       id: crypto.randomUUID(),
       text,
+      memo: '',
       createdAt: new Date().toISOString(),
     });
     saveTodos(todos);
@@ -836,7 +896,7 @@
     const entries = loadEntries();
     entries.push({
       id: crypto.randomUUID(),
-      content: todo.text,
+      content: todo.memo ? `${todo.text}\n\n${todo.memo}` : todo.text,
       start: nowIso,
       end: null,
       category: null,
@@ -848,6 +908,12 @@
 
     renderTodos();
     render();
+  }
+
+  function saveTodoMemo(id, memo) {
+    const todos = loadTodos().map((t) => (t.id === id ? { ...t, memo } : t));
+    saveTodos(todos);
+    renderTodos();
   }
 
   function deleteTodo(id) {
@@ -867,8 +933,21 @@
       <li class="todo-item" data-id="${t.id}">
         <input type="checkbox" class="todo-check">
         <div class="todo-body">
-          <div class="todo-text"></div>
+          <div class="todo-text-row">
+            <span class="todo-text"></span>
+            <span class="memo-trigger">
+              <span class="memo-trigger-label"></span>
+              <span class="memo-popup"></span>
+            </span>
+          </div>
           <div class="todo-meta">생성 ${formatKoreanShort(t.createdAt)}</div>
+          <div class="memo-edit hidden">
+            <textarea class="memo-textarea" placeholder="상세 메모를 입력하세요"></textarea>
+            <div class="memo-edit-actions">
+              <button type="button" class="memo-cancel-btn">취소</button>
+              <button type="button" class="memo-save-btn">저장</button>
+            </div>
+          </div>
         </div>
         <button class="icon-btn danger delete-btn">삭제</button>
       </li>
@@ -882,6 +961,27 @@
         if (e.target.checked) completeTodo(id);
       });
       bindDeleteConfirm(li.querySelector('.delete-btn'), () => deleteTodo(id));
+
+      const memoTrigger = li.querySelector('.memo-trigger');
+      const memoLabel = li.querySelector('.memo-trigger-label');
+      const memoPopup = li.querySelector('.memo-popup');
+      const memoEdit = li.querySelector('.memo-edit');
+      const memoTextarea = li.querySelector('.memo-textarea');
+
+      memoLabel.textContent = todo.memo ? '📝 메모' : '+ 메모';
+      memoPopup.textContent = todo.memo || '';
+
+      memoTrigger.addEventListener('click', () => {
+        memoTextarea.value = todo.memo || '';
+        memoEdit.classList.toggle('hidden');
+        if (!memoEdit.classList.contains('hidden')) memoTextarea.focus();
+      });
+      li.querySelector('.memo-cancel-btn').addEventListener('click', () => {
+        memoEdit.classList.add('hidden');
+      });
+      li.querySelector('.memo-save-btn').addEventListener('click', () => {
+        saveTodoMemo(id, memoTextarea.value.trim());
+      });
     });
   }
 
