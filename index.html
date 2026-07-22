@@ -384,6 +384,40 @@
     font-size: 13px;
     padding: 16px 0;
   }
+  .search-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .search-row input[type="text"] {
+    flex: 1;
+    min-width: 140px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 13.5px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .search-row input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .search-row input[type="date"] {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .search-row button {
+    background: var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 7px 14px;
+  }
 </style>
 </head>
 <body>
@@ -439,6 +473,12 @@
     <div id="summaryBody"></div>
   </section>
 
+  <div class="search-row">
+    <input type="text" id="searchInput" placeholder="🔍 검색어 (내용/카테고리)">
+    <input type="date" id="searchDateInput">
+    <button type="button" id="resetSearchBtn">초기화</button>
+  </div>
+
   <section class="entry-list" id="entryList"></section>
 </div>
 
@@ -475,6 +515,10 @@
   const addCategoryBtn = document.getElementById('addCategoryBtn');
   const summaryRange = document.getElementById('summaryRange');
   const summaryBody = document.getElementById('summaryBody');
+
+  const searchInput = document.getElementById('searchInput');
+  const searchDateInput = document.getElementById('searchDateInput');
+  const resetSearchBtn = document.getElementById('resetSearchBtn');
 
   let editingId = null;
   let pipWindow = null;
@@ -924,6 +968,14 @@
 
   cancelEditBtn.addEventListener('click', resetForm);
 
+  searchInput.addEventListener('input', render);
+  searchDateInput.addEventListener('change', render);
+  resetSearchBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    searchDateInput.value = '';
+    render();
+  });
+
   function startEdit(entry) {
     editingId = entry.id;
     contentInput.value = entry.content;
@@ -951,13 +1003,36 @@
     render();
   }
 
+  function matchesSearch(entry, keyword, dateFilter) {
+    if (keyword) {
+      const haystack = `${entry.content} ${entry.category || ''}`.toLowerCase();
+      if (!haystack.includes(keyword)) return false;
+    }
+    if (dateFilter) {
+      const startDate = entry.start.slice(0, 10);
+      const endDate = entry.end ? entry.end.slice(0, 10) : startDate;
+      if (dateFilter < startDate || dateFilter > endDate) return false;
+    }
+    return true;
+  }
+
   function render() {
-    const entries = loadEntries().sort((a, b) => new Date(b.start) - new Date(a.start));
-    entryCount.textContent = entries.length ? `총 ${entries.length}건` : '';
+    const keyword = searchInput.value.trim().toLowerCase();
+    const dateFilter = searchDateInput.value;
+    const isFiltering = !!keyword || !!dateFilter;
+
+    const allEntries = loadEntries();
+    const entries = allEntries
+      .filter((e) => matchesSearch(e, keyword, dateFilter))
+      .sort((a, b) => new Date(b.start) - new Date(a.start));
+
+    entryCount.textContent = isFiltering
+      ? (entries.length ? `검색결과 ${entries.length}건` : '검색결과 없음')
+      : (allEntries.length ? `총 ${allEntries.length}건` : '');
     renderSummary();
 
     if (!entries.length) {
-      entryList.innerHTML = '<div class="empty-state">아직 작성된 업무일지가 없습니다.</div>';
+      entryList.innerHTML = `<div class="empty-state">${isFiltering ? '검색 결과가 없습니다.' : '아직 작성된 업무일지가 없습니다.'}</div>`;
       return;
     }
 
