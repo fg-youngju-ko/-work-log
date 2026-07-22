@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>업무일지</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --note-bg: #fffdf4;
+    --note-border: #f0e6b8;
+    --text: #1f2328;
+    --text-muted: #6b7280;
+    --accent: #f5b400;
+    --accent-dark: #d99a00;
+    --danger: #ef4444;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181c;
+      --card-bg: #1f2126;
+      --note-bg: #262820;
+      --note-border: #3a3626;
+      --text: #e8e9ec;
+      --text-muted: #9a9ea5;
+      --accent: #f5b400;
+      --accent-dark: #ffcc33;
+      --danger: #f87171;
+      --border: #2e3036;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181c; --card-bg: #1f2126; --note-bg: #262820; --note-border: #3a3626;
+    --text: #e8e9ec; --text-muted: #9a9ea5; --accent: #f5b400; --accent-dark: #ffcc33;
+    --danger: #f87171; --border: #2e3036; --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f7; --card-bg: #ffffff; --note-bg: #fffdf4; --note-border: #f0e6b8;
+    --text: #1f2328; --text-muted: #6b7280; --accent: #f5b400; --accent-dark: #d99a00;
+    --danger: #ef4444; --border: #e5e7eb; --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Pretendard", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  header h1 {
+    font-size: 22px;
+    margin: 0;
+  }
+  header .count {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .form-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+  }
+  textarea#contentInput {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 14.5px;
+    font-family: inherit;
+    background: transparent;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  textarea#contentInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .datetime-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .datetime-row label { display: flex; align-items: center; gap: 6px; }
+  .datetime-row input[type="datetime-local"] {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .hidden { display: none !important; }
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    border: none;
+    border-radius: 9px;
+    padding: 9px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: opacity .15s;
+  }
+  button:hover { opacity: 0.85; }
+  #saveBtn { background: var(--accent); color: #1f2328; }
+  #cancelEditBtn { background: var(--border); color: var(--text); }
+  .entry-list { display: flex; flex-direction: column; gap: 14px; }
+  .entry-card {
+    background: var(--note-bg);
+    border: 1px solid var(--note-border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .entry-meta {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .entry-meta .stamp { font-weight: 600; color: var(--accent-dark); }
+  .entry-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+  .entry-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .icon-btn {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 3px 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+  }
+  .icon-btn:hover { background: var(--border); opacity: 1; }
+  .icon-btn.danger { color: var(--danger); }
+  .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 60px 0;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>📝 업무일지</h1>
+    <span class="count" id="entryCount"></span>
+  </header>
+
+  <section class="form-card">
+    <textarea id="contentInput" placeholder="오늘 한 업무를 입력하세요..."></textarea>
+    <div class="datetime-row">
+      <label>시작 <input type="datetime-local" id="startInput"></label>
+      <label><input type="checkbox" id="rangeToggle"> 기간으로 설정</label>
+      <label id="endLabel" class="hidden">종료 <input type="datetime-local" id="endInput"></label>
+    </div>
+    <div class="actions">
+      <button id="cancelEditBtn" class="hidden">취소</button>
+      <button id="saveBtn">저장</button>
+    </div>
+  </section>
+
+  <section class="entry-list" id="entryList"></section>
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'workLog.entries';
+
+  const contentInput = document.getElementById('contentInput');
+  const startInput = document.getElementById('startInput');
+  const endInput = document.getElementById('endInput');
+  const endLabel = document.getElementById('endLabel');
+  const rangeToggle = document.getElementById('rangeToggle');
+  const saveBtn = document.getElementById('saveBtn');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const entryList = document.getElementById('entryList');
+  const entryCount = document.getElementById('entryCount');
+
+  let editingId = null;
+
+  function loadEntries() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveEntries(entries) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+
+  function toDatetimeLocalValue(date) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function formatKorean(isoString) {
+    const d = new Date(isoString);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}년 ${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function resetForm() {
+    contentInput.value = '';
+    startInput.value = toDatetimeLocalValue(new Date());
+    rangeToggle.checked = false;
+    endLabel.classList.add('hidden');
+    endInput.value = '';
+    editingId = null;
+    saveBtn.textContent = '저장';
+    cancelEditBtn.classList.add('hidden');
+  }
+
+  rangeToggle.addEventListener('change', () => {
+    endLabel.classList.toggle('hidden', !rangeToggle.checked);
+    if (rangeToggle.checked && !endInput.value) {
+      endInput.value = startInput.value;
+    }
+  });
+
+  saveBtn.addEventListener('click', () => {
+    const content = contentInput.value.trim();
+    if (!content) {
+      contentInput.focus();
+      return;
+    }
+    if (!startInput.value) {
+      startInput.value = toDatetimeLocalValue(new Date());
+    }
+
+    const start = new Date(startInput.value).toISOString();
+    const end = rangeToggle.checked && endInput.value ? new Date(endInput.value).toISOString() : null;
+    const nowIso = new Date().toISOString();
+
+    let entries = loadEntries();
+
+    if (editingId) {
+      entries = entries.map((e) =>
+        e.id === editingId ? { ...e, content, start, end, updatedAt: nowIso } : e
+      );
+    } else {
+      entries.push({
+        id: crypto.randomUUID(),
+        content,
+        start,
+        end,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+    }
+
+    saveEntries(entries);
+    resetForm();
+    render();
+  });
+
+  cancelEditBtn.addEventListener('click', resetForm);
+
+  function startEdit(entry) {
+    editingId = entry.id;
+    contentInput.value = entry.content;
+    startInput.value = toDatetimeLocalValue(new Date(entry.start));
+    if (entry.end) {
+      rangeToggle.checked = true;
+      endLabel.classList.remove('hidden');
+      endInput.value = toDatetimeLocalValue(new Date(entry.end));
+    } else {
+      rangeToggle.checked = false;
+      endLabel.classList.add('hidden');
+      endInput.value = '';
+    }
+    saveBtn.textContent = '수정 완료';
+    cancelEditBtn.classList.remove('hidden');
+    contentInput.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function deleteEntry(id) {
+    if (!confirm('이 항목을 삭제할까요?')) return;
+    const entries = loadEntries().filter((e) => e.id !== id);
+    saveEntries(entries);
+    if (editingId === id) resetForm();
+    render();
+  }
+
+  function render() {
+    const entries = loadEntries().sort((a, b) => new Date(b.start) - new Date(a.start));
+    entryCount.textContent = entries.length ? `총 ${entries.length}건` : '';
+
+    if (!entries.length) {
+      entryList.innerHTML = '<div class="empty-state">아직 작성된 업무일지가 없습니다.</div>';
+      return;
+    }
+
+    entryList.innerHTML = entries.map((e) => {
+      const stamp = e.end
+        ? `${formatKorean(e.start)} ~ ${formatKorean(e.end)}`
+        : formatKorean(e.start);
+      return `
+        <div class="entry-card" data-id="${e.id}">
+          <div class="entry-meta">
+            <span class="stamp">${stamp}</span>
+            <span class="entry-actions">
+              <button class="icon-btn edit-btn">수정</button>
+              <button class="icon-btn danger delete-btn">삭제</button>
+            </span>
+          </div>
+          <div class="entry-content"></div>
+        </div>
+      `;
+    }).join('');
+
+    entryList.querySelectorAll('.entry-card').forEach((card) => {
+      const id = card.getAttribute('data-id');
+      const entry = entries.find((e) => e.id === id);
+      card.querySelector('.entry-content').textContent = entry.content;
+      card.querySelector('.edit-btn').addEventListener('click', () => startEdit(entry));
+      card.querySelector('.delete-btn').addEventListener('click', () => deleteEntry(id));
+    });
+  }
+
+  resetForm();
+  render();
+})();
+</script>
+</body>
+</html>
