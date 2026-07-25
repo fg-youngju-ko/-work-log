@@ -220,6 +220,15 @@
     color: var(--text);
   }
   #todoInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #todoCategoryInput {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 6px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
   #todoAddBtn { background: var(--accent); color: #1f2328; padding: 8px 16px; }
   .todo-list {
     list-style: none;
@@ -535,6 +544,7 @@
     </div>
     <div class="todo-input-row">
       <input type="text" id="todoInput" placeholder="할 일을 입력하세요">
+      <select id="todoCategoryInput"></select>
       <button id="todoAddBtn">추가</button>
     </div>
     <ul class="todo-list" id="todoList"></ul>
@@ -603,6 +613,7 @@
   const todoSection = document.getElementById('todoSection');
   const todoPlaceholder = document.getElementById('todoPlaceholder');
   const todoInput = document.getElementById('todoInput');
+  const todoCategoryInput = document.getElementById('todoCategoryInput');
   const todoAddBtn = document.getElementById('todoAddBtn');
   const todoList = document.getElementById('todoList');
   const pipBtn = document.getElementById('pipBtn');
@@ -714,6 +725,10 @@
     buildCategoryOptions(categoryInput, current);
   }
 
+  function refreshTodoCategoryInput() {
+    buildCategoryOptions(todoCategoryInput, todoCategoryInput.value);
+  }
+
   function renderCategoryChips() {
     const categories = loadCategories();
     categoryChipList.innerHTML = '';
@@ -754,6 +769,7 @@
     newCategoryInput.value = '';
     renderCategoryChips();
     renderCategorySelect();
+    refreshTodoCategoryInput();
     newCategoryInput.focus();
   }
 
@@ -761,6 +777,7 @@
     saveCategories(loadCategories().filter((c) => c !== name));
     renderCategoryChips();
     renderCategorySelect();
+    refreshTodoCategoryInput();
   }
 
   categoryManageBtn.addEventListener('click', () => {
@@ -901,11 +918,12 @@
       id: crypto.randomUUID(),
       text,
       memo: '',
-      category: null,
+      category: todoCategoryInput.value || null,
       createdAt: new Date().toISOString(),
     });
     saveTodos(todos);
     todoInput.value = '';
+    todoCategoryInput.value = '';
     todoInput.focus();
     renderTodos();
   }
@@ -1284,6 +1302,7 @@
         }
 
         renderCategorySelect();
+        refreshTodoCategoryInput();
         render();
         renderTodos();
         showIoStatus(`가져오기 완료 (업무일지 ${addedEntries}건, TODO ${addedTodos}건 추가)`);
@@ -1297,6 +1316,7 @@
 
   migrateCompletedTodos();
   resetForm();
+  refreshTodoCategoryInput();
   render();
   renderTodos();
 })();
