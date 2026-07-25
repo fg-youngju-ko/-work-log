@@ -531,8 +531,8 @@
   </header>
 
   <div class="io-row">
-    <button type="button" id="exportBtn">⬇ 내보내기</button>
-    <button type="button" id="importBtn">⬆ 가져오기</button>
+    <button type="button" id="exportBtn">⬇ 백업 다운로드</button>
+    <button type="button" id="importBtn">⬆ 백업 업로드</button>
     <input type="file" id="importFile" accept="application/json" class="hidden">
     <span class="io-status" id="ioStatus"></span>
   </div>
@@ -1246,7 +1246,7 @@
     });
   }
 
-  // ---- 가져오기/내보내기 ----
+  // ---- 백업 업로드/다운로드 ----
 
   function showIoStatus(msg) {
     ioStatus.textContent = msg;
@@ -1268,7 +1268,7 @@
     a.download = `업무일지_백업_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showIoStatus('내보내기 완료');
+    showIoStatus('백업 다운로드 완료');
   });
 
   importBtn.addEventListener('click', () => importFile.click());
@@ -1305,9 +1305,9 @@
         refreshTodoCategoryInput();
         render();
         renderTodos();
-        showIoStatus(`가져오기 완료 (업무일지 ${addedEntries}건, TODO ${addedTodos}건 추가)`);
+        showIoStatus(`백업 업로드 완료 (업무일지 ${addedEntries}건, TODO ${addedTodos}건 추가)`);
       } catch {
-        showIoStatus('가져오기 실패: JSON 파일 형식을 확인해주세요.');
+        showIoStatus('백업 업로드 실패: JSON 파일 형식을 확인해주세요.');
       }
       importFile.value = '';
     };
