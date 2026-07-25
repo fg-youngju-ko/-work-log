@@ -392,6 +392,7 @@
     gap: 6px;
     margin-bottom: 10px;
   }
+  .category-chip-wrap { position: relative; display: inline-flex; }
   .category-chip {
     display: flex;
     align-items: center;
@@ -401,6 +402,7 @@
     border-radius: 999px;
     padding: 4px 6px 4px 12px;
     font-size: 12.5px;
+    cursor: pointer;
   }
   .category-chip button {
     background: transparent;
@@ -410,6 +412,43 @@
     padding: 2px 6px;
     font-size: 13px;
     font-weight: 700;
+  }
+  .color-swatch-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 10px;
+    width: 172px;
+    z-index: 30;
+  }
+  .color-swatch-panel.open { display: block; }
+  .color-swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .color-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    padding: 0;
+  }
+  .color-swatch.selected { border-color: var(--text); }
+  .color-swatch-auto-btn {
+    width: 100%;
+    font-size: 11.5px;
+    padding: 5px;
+    background: var(--border);
+    color: var(--text);
   }
   .category-add-row { display: flex; gap: 6px; }
   .category-add-row input {
@@ -700,18 +739,48 @@
   }
 
   // ---- 카테고리 색상 ----
-  // 색맹 안전성 검증된 8색 팔레트(고정 순서). 카테고리 이름을 해시해 슬롯을 정하므로
-  // 카테고리를 추가/삭제해도 기존 카테고리의 색은 바뀌지 않는다.
+  // 색상환에 고르게 흩어진 14색. 카테고리 이름을 해시해 기본 슬롯을 정하되,
+  // 사용자가 카테고리 관리에서 직접 슬롯을 골라 덮어쓸 수 있다(workLog.categoryColors).
   const CATEGORY_COLOR_SLOTS = [
-    { light: '#2a78d6', dark: '#3987e5' }, // blue
-    { light: '#eb6834', dark: '#d95926' }, // orange
-    { light: '#1baf7a', dark: '#199e70' }, // aqua
-    { light: '#eda100', dark: '#c98500' }, // yellow
-    { light: '#e87ba4', dark: '#d55181' }, // magenta
-    { light: '#008300', dark: '#008300' }, // green
-    { light: '#4a3aa7', dark: '#9085e9' }, // violet
-    { light: '#e34948', dark: '#e66767' }, // red
+    { light: '#2573c1', dark: '#699ed3' },
+    { light: '#2530c1', dark: '#6970d3' },
+    { light: '#5c25c1', dark: '#8f69d3' },
+    { light: '#9f25c1', dark: '#bd69d3' },
+    { light: '#c1259f', dark: '#d369bd' },
+    { light: '#c1255c', dark: '#d3698f' },
+    { light: '#c13025', dark: '#d37069' },
+    { light: '#c17325', dark: '#d39e69' },
+    { light: '#c1b625', dark: '#d3cc69' },
+    { light: '#89c125', dark: '#add369' },
+    { light: '#46c125', dark: '#80d369' },
+    { light: '#25c146', dark: '#69d380' },
+    { light: '#25c189', dark: '#69d3ad' },
+    { light: '#25b6c1', dark: '#69ccd3' },
   ];
+
+  const CATEGORY_COLOR_MAP_KEY = 'workLog.categoryColors';
+
+  function loadCategoryColorMap() {
+    try {
+      return JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveCategoryColorMap(map) {
+    localStorage.setItem(CATEGORY_COLOR_MAP_KEY, JSON.stringify(map));
+  }
+
+  function setCategoryColorOverride(name, slotIndex) {
+    const map = loadCategoryColorMap();
+    if (slotIndex === null) {
+      delete map[name];
+    } else {
+      map[name] = slotIndex;
+    }
+    saveCategoryColorMap(map);
+  }
 
   function hashCategoryName(name) {
     let hash = 0;
@@ -719,6 +788,14 @@
       hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
     }
     return hash % CATEGORY_COLOR_SLOTS.length;
+  }
+
+  function getCategorySlotIndex(name) {
+    const overrides = loadCategoryColorMap();
+    if (Number.isInteger(overrides[name]) && CATEGORY_COLOR_SLOTS[overrides[name]]) {
+      return overrides[name];
+    }
+    return hashCategoryName(name);
   }
 
   function isDarkMode() {
@@ -739,7 +816,7 @@
 
   function getCategoryColor(name) {
     if (!name) return null;
-    const slot = CATEGORY_COLOR_SLOTS[hashCategoryName(name)];
+    const slot = CATEGORY_COLOR_SLOTS[getCategorySlotIndex(name)];
     const bg = isDarkMode() ? slot.dark : slot.light;
     return { bg, text: pickTextColor(bg) };
   }
@@ -809,6 +886,9 @@
       return;
     }
     categories.forEach((c) => {
+      const wrap = document.createElement('span');
+      wrap.className = 'category-chip-wrap';
+
       const chip = document.createElement('span');
       chip.className = 'category-chip';
       const color = getCategoryColor(c);
@@ -823,10 +903,55 @@
       removeBtn.type = 'button';
       removeBtn.textContent = '×';
       if (color) removeBtn.style.color = color.text;
-      removeBtn.addEventListener('click', () => removeCategory(c));
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeCategory(c);
+      });
       chip.appendChild(label);
       chip.appendChild(removeBtn);
-      categoryChipList.appendChild(chip);
+
+      const panel = document.createElement('div');
+      panel.className = 'color-swatch-panel';
+      const grid = document.createElement('div');
+      grid.className = 'color-swatch-grid';
+      const currentIndex = getCategorySlotIndex(c);
+      CATEGORY_COLOR_SLOTS.forEach((slot, idx) => {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'color-swatch' + (idx === currentIndex ? ' selected' : '');
+        swatch.style.background = isDarkMode() ? slot.dark : slot.light;
+        swatch.title = `색상 ${idx + 1}`;
+        swatch.addEventListener('click', () => {
+          setCategoryColorOverride(c, idx);
+          renderCategoryChips();
+          render();
+          renderTodos();
+        });
+        grid.appendChild(swatch);
+      });
+      const autoBtn = document.createElement('button');
+      autoBtn.type = 'button';
+      autoBtn.className = 'color-swatch-auto-btn';
+      autoBtn.textContent = '자동 배정으로';
+      autoBtn.addEventListener('click', () => {
+        setCategoryColorOverride(c, null);
+        renderCategoryChips();
+        render();
+        renderTodos();
+      });
+      panel.appendChild(grid);
+      panel.appendChild(autoBtn);
+
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.color-swatch-panel.open').forEach((p) => {
+          if (p !== panel) p.classList.remove('open');
+        });
+        panel.classList.toggle('open');
+      });
+
+      wrap.appendChild(chip);
+      wrap.appendChild(panel);
+      categoryChipList.appendChild(wrap);
     });
   }
 
@@ -862,6 +987,10 @@
   addCategoryBtn.addEventListener('click', addCategory);
   newCategoryInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addCategory();
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.category-chip-wrap')) return;
+    document.querySelectorAll('.color-swatch-panel.open').forEach((p) => p.classList.remove('open'));
   });
 
   // ---- 주간 요약 ----
