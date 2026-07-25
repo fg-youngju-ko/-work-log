@@ -301,10 +301,29 @@
   }
   .memo-edit-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 6px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: 6px;
   }
+  .memo-category-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .memo-category-label select {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .memo-edit-actions .memo-edit-buttons { display: flex; gap: 6px; }
   .memo-edit-actions button { padding: 5px 12px; font-size: 12px; }
   .memo-save-btn { background: var(--accent); color: #1f2328; }
   .memo-cancel-btn { background: var(--border); color: var(--text); }
@@ -674,21 +693,25 @@
     localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
   }
 
-  function renderCategorySelect(selectedValue) {
+  function buildCategoryOptions(selectEl, currentValue) {
     const categories = loadCategories();
-    const current = selectedValue !== undefined ? selectedValue : categoryInput.value;
-    categoryInput.innerHTML = '';
+    selectEl.innerHTML = '';
     const noneOpt = document.createElement('option');
     noneOpt.value = '';
     noneOpt.textContent = '미분류';
-    categoryInput.appendChild(noneOpt);
+    selectEl.appendChild(noneOpt);
     categories.forEach((c) => {
       const opt = document.createElement('option');
       opt.value = c;
       opt.textContent = c;
-      categoryInput.appendChild(opt);
+      selectEl.appendChild(opt);
     });
-    categoryInput.value = categories.includes(current) ? current : '';
+    selectEl.value = categories.includes(currentValue) ? currentValue : '';
+  }
+
+  function renderCategorySelect(selectedValue) {
+    const current = selectedValue !== undefined ? selectedValue : categoryInput.value;
+    buildCategoryOptions(categoryInput, current);
   }
 
   function renderCategoryChips() {
@@ -854,7 +877,7 @@
         content: t.memo ? `${t.text}\n\n${t.memo}` : t.text,
         start: stamp,
         end: null,
-        category: null,
+        category: t.category || null,
         createdAt: stamp,
         updatedAt: stamp,
       });
@@ -878,6 +901,7 @@
       id: crypto.randomUUID(),
       text,
       memo: '',
+      category: null,
       createdAt: new Date().toISOString(),
     });
     saveTodos(todos);
@@ -899,7 +923,7 @@
       content: todo.memo ? `${todo.text}\n\n${todo.memo}` : todo.text,
       start: nowIso,
       end: null,
-      category: null,
+      category: todo.category || null,
       createdAt: nowIso,
       updatedAt: nowIso,
     });
@@ -910,8 +934,8 @@
     render();
   }
 
-  function saveTodoMemo(id, memo) {
-    const todos = loadTodos().map((t) => (t.id === id ? { ...t, memo } : t));
+  function saveTodoMemo(id, memo, category) {
+    const todos = loadTodos().map((t) => (t.id === id ? { ...t, memo, category } : t));
     saveTodos(todos);
     renderTodos();
   }
@@ -935,6 +959,7 @@
         <div class="todo-body">
           <div class="todo-text-row">
             <span class="todo-text"></span>
+            <span class="category-tag"></span>
             <span class="memo-trigger">
               <span class="memo-trigger-label"></span>
               <span class="memo-popup"></span>
@@ -944,8 +969,11 @@
           <div class="memo-edit hidden">
             <textarea class="memo-textarea" placeholder="상세 메모를 입력하세요"></textarea>
             <div class="memo-edit-actions">
-              <button type="button" class="memo-cancel-btn">취소</button>
-              <button type="button" class="memo-save-btn">저장</button>
+              <label class="memo-category-label">카테고리 <select class="memo-category-select"></select></label>
+              <div class="memo-edit-buttons">
+                <button type="button" class="memo-cancel-btn">취소</button>
+                <button type="button" class="memo-save-btn">저장</button>
+              </div>
             </div>
           </div>
         </div>
@@ -962,17 +990,22 @@
       });
       bindDeleteConfirm(li.querySelector('.delete-btn'), () => deleteTodo(id));
 
+      li.querySelector('.category-tag').textContent = todo.category || '미분류';
+
       const memoTrigger = li.querySelector('.memo-trigger');
       const memoLabel = li.querySelector('.memo-trigger-label');
       const memoPopup = li.querySelector('.memo-popup');
       const memoEdit = li.querySelector('.memo-edit');
       const memoTextarea = li.querySelector('.memo-textarea');
+      const memoCategorySelect = li.querySelector('.memo-category-select');
 
       memoLabel.textContent = todo.memo ? '📝 메모' : '+ 메모';
       memoPopup.textContent = todo.memo || '';
+      buildCategoryOptions(memoCategorySelect, todo.category || '');
 
       memoTrigger.addEventListener('click', () => {
         memoTextarea.value = todo.memo || '';
+        buildCategoryOptions(memoCategorySelect, todo.category || '');
         memoEdit.classList.toggle('hidden');
         if (!memoEdit.classList.contains('hidden')) memoTextarea.focus();
       });
@@ -980,7 +1013,7 @@
         memoEdit.classList.add('hidden');
       });
       li.querySelector('.memo-save-btn').addEventListener('click', () => {
-        saveTodoMemo(id, memoTextarea.value.trim());
+        saveTodoMemo(id, memoTextarea.value.trim(), memoCategorySelect.value || null);
       });
     });
   }
