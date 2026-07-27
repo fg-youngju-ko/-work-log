@@ -1013,6 +1013,14 @@
     return `${d.getFullYear()}년 ${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일`;
   }
 
+  // TODO 완료 이관 시 "제목\n\n메모" 형태로 합쳐진 content를 요약 카드에서
+  // 다시 나눠 보여주기 위한 분리 함수. 이중 줄바꿈이 없으면 메모 없음으로 간주.
+  function splitEntryContent(content) {
+    const idx = content.indexOf('\n\n');
+    if (idx === -1) return { title: content, memo: '' };
+    return { title: content.slice(0, idx), memo: content.slice(idx + 2) };
+  }
+
   function renderSummary() {
     const { start, end } = getWeekRange(new Date());
     summaryRange.textContent = `${formatDateShort(start)} ~ ${formatDateShort(end)}`;
@@ -1061,6 +1069,8 @@
         groupEl.appendChild(titleEl);
 
         items.forEach((e) => {
+          const { title, memo } = splitEntryContent(e.content);
+
           const itemEl = document.createElement('div');
           itemEl.className = 'summary-item';
           const timeEl = document.createElement('span');
@@ -1068,9 +1078,25 @@
           timeEl.textContent = formatKoreanShort(e.start);
           const textEl = document.createElement('span');
           textEl.className = 'summary-text';
-          textEl.textContent = e.content;
+          textEl.textContent = title;
           itemEl.appendChild(timeEl);
           itemEl.appendChild(textEl);
+
+          if (memo) {
+            itemEl.appendChild(document.createTextNode(' '));
+            const trigger = document.createElement('span');
+            trigger.className = 'memo-trigger';
+            const label = document.createElement('span');
+            label.className = 'memo-trigger-label';
+            label.textContent = '📝';
+            const popup = document.createElement('span');
+            popup.className = 'memo-popup';
+            popup.textContent = memo;
+            trigger.appendChild(label);
+            trigger.appendChild(popup);
+            itemEl.appendChild(trigger);
+          }
+
           groupEl.appendChild(itemEl);
         });
 
