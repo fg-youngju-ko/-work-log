@@ -51,9 +51,17 @@
     color: var(--text);
   }
   .app {
-    max-width: 720px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 32px 20px 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  .left-col, .right-col { min-width: 0; }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; max-width: 720px; }
   }
   header {
     display: flex;
@@ -571,10 +579,170 @@
     font-size: 12px;
     color: var(--text-muted);
   }
+  .daily-card, .calendar-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+  }
+  .daily-header, .calendar-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .daily-header h2 { font-size: 15px; margin: 0; }
+  .daily-input-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .daily-input-row input[type="text"] {
+    flex: 1;
+    min-width: 140px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    background: transparent;
+    color: var(--text);
+  }
+  .daily-input-row select {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 6px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  #dailyAddBtn { background: var(--accent); color: #1f2328; padding: 8px 16px; }
+  .calendar-header {
+    justify-content: space-between;
+  }
+  .calendar-header button {
+    background: var(--border);
+    color: var(--text);
+    padding: 4px 12px;
+    font-size: 14px;
+  }
+  .calendar-header span { font-size: 14px; font-weight: 600; }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .calendar-weekday {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-bottom: 4px;
+  }
+  .calendar-day {
+    position: relative;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 12.5px;
+    color: var(--text);
+    cursor: default;
+  }
+  .calendar-day.empty { visibility: hidden; }
+  .calendar-day.today {
+    background: var(--accent);
+    color: #1f2328;
+    font-weight: 700;
+  }
+  .calendar-day.has-events:not(.today) { background: var(--bg); font-weight: 600; }
+  .calendar-day .day-dot {
+    position: absolute;
+    bottom: 3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-dark);
+  }
+  .calendar-day.today .day-dot { background: #1f2328; }
+  .calendar-day .day-popup {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 8px;
+    width: max-content;
+    max-width: 220px;
+    z-index: 25;
+    text-align: left;
+    cursor: default;
+  }
+  .calendar-day.has-events:hover .day-popup { display: block; }
+  .day-popup-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text);
+    padding: 3px 0;
+  }
+  .day-popup-item .day-popup-text { white-space: pre-wrap; word-break: break-word; }
+  .day-popup-item button {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0 4px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .calendar-add-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .calendar-add-row input[type="date"] {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .calendar-add-row input[type="text"] {
+    flex: 1;
+    min-width: 120px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-family: inherit;
+    font-size: 13.5px;
+    background: transparent;
+    color: var(--text);
+  }
+  #calAddBtn { background: var(--accent); color: #1f2328; padding: 7px 14px; }
+  .todo-item .source-badge {
+    font-size: 10px;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 4px;
+  }
 </style>
 </head>
 <body>
 <div class="app">
+<div class="left-col">
   <header>
     <h1>📝 업무일지</h1>
     <span class="count" id="entryCount"></span>
@@ -644,6 +812,48 @@
   <section class="entry-list" id="entryList"></section>
 </div>
 
+<div class="right-col">
+  <section class="daily-card">
+    <div class="daily-header">
+      <h2>🔁 데일리 업무</h2>
+    </div>
+    <div class="daily-input-row">
+      <input type="text" id="dailyInput" placeholder="매일/매주 할 일을 입력하세요">
+      <select id="dailyFrequencyInput">
+        <option value="daily">매일</option>
+        <option value="weekly">매주</option>
+      </select>
+      <select id="dailyWeekdayInput" class="hidden">
+        <option value="0">일</option>
+        <option value="1">월</option>
+        <option value="2">화</option>
+        <option value="3">수</option>
+        <option value="4">목</option>
+        <option value="5">금</option>
+        <option value="6">토</option>
+      </select>
+      <select id="dailyCategoryInput"></select>
+      <button id="dailyAddBtn">추가</button>
+    </div>
+    <ul class="todo-list" id="dailyList"></ul>
+  </section>
+
+  <section class="calendar-card">
+    <div class="calendar-header">
+      <button type="button" id="calPrevBtn">‹</button>
+      <span id="calTitle"></span>
+      <button type="button" id="calNextBtn">›</button>
+    </div>
+    <div class="calendar-grid" id="calGrid"></div>
+    <div class="calendar-add-row">
+      <input type="date" id="calDateInput">
+      <input type="text" id="calTextInput" placeholder="해당 날짜에 할 일을 입력하세요">
+      <button type="button" id="calAddBtn">추가</button>
+    </div>
+  </section>
+</div>
+</div>
+
 <script>
 (function () {
   const STORAGE_KEY = 'workLog.entries';
@@ -688,6 +898,22 @@
   const importBtn = document.getElementById('importBtn');
   const importFile = document.getElementById('importFile');
   const ioStatus = document.getElementById('ioStatus');
+
+  const dailyInput = document.getElementById('dailyInput');
+  const dailyFrequencyInput = document.getElementById('dailyFrequencyInput');
+  const dailyWeekdayInput = document.getElementById('dailyWeekdayInput');
+  const dailyCategoryInput = document.getElementById('dailyCategoryInput');
+  const dailyAddBtn = document.getElementById('dailyAddBtn');
+  const dailyList = document.getElementById('dailyList');
+
+  const calPrevBtn = document.getElementById('calPrevBtn');
+  const calNextBtn = document.getElementById('calNextBtn');
+  const calTitle = document.getElementById('calTitle');
+  const calGrid = document.getElementById('calGrid');
+  const calDateInput = document.getElementById('calDateInput');
+  const calTextInput = document.getElementById('calTextInput');
+  const calAddBtn = document.getElementById('calAddBtn');
+  let calViewDate = new Date();
 
   let editingId = null;
   let pipWindow = null;
@@ -995,6 +1221,7 @@
     renderCategorySelect();
     refreshTodoCategoryInput();
     refreshSearchCategoryInput();
+    refreshDailyCategoryInput();
     newCategoryInput.focus();
   }
 
@@ -1004,6 +1231,7 @@
     renderCategorySelect();
     refreshTodoCategoryInput();
     refreshSearchCategoryInput();
+    refreshDailyCategoryInput();
   }
 
   categoryManageBtn.addEventListener('click', () => {
@@ -1130,6 +1358,82 @@
       });
   }
 
+  function getTodayStr() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  // ---- 공용 항목 UI (TODO/데일리/달력이 함께 쓰는 체크+메모+카테고리 항목 렌더링) ----
+
+  function buildItemLi(item, opts) {
+    const badge = opts && opts.badge ? `<span class="source-badge">${opts.badge}</span>` : '';
+    return `
+      <li class="todo-item" data-key="${item.__key}">
+        <input type="checkbox" class="todo-check">
+        <div class="todo-body">
+          <div class="todo-text-row">
+            <span class="todo-text"></span>
+            ${badge}
+            <span class="category-tag"></span>
+            <span class="memo-trigger">
+              <span class="memo-trigger-label"></span>
+              <span class="memo-popup"></span>
+            </span>
+          </div>
+          <div class="todo-meta">생성 ${formatKoreanShort(item.createdAt)}</div>
+          <div class="memo-edit hidden">
+            <textarea class="memo-textarea" placeholder="상세 메모를 입력하세요"></textarea>
+            <div class="memo-edit-actions">
+              <label class="memo-category-label">카테고리 <select class="memo-category-select"></select></label>
+              <div class="memo-edit-buttons">
+                <button type="button" class="memo-cancel-btn">취소</button>
+                <button type="button" class="memo-save-btn">저장</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="icon-btn danger delete-btn">삭제</button>
+      </li>
+    `;
+  }
+
+  function bindItemLi(li, item, handlers) {
+    li.querySelector('.todo-text').textContent = item.text;
+    li.querySelector('.todo-check').addEventListener('change', (e) => {
+      if (e.target.checked) handlers.onComplete(item);
+    });
+    bindDeleteConfirm(li.querySelector('.delete-btn'), () => handlers.onDelete(item));
+
+    const tag = li.querySelector('.category-tag');
+    tag.textContent = item.category || '미분류';
+    applyCategoryTagColor(tag, item.category);
+
+    const memoTrigger = li.querySelector('.memo-trigger');
+    const memoLabel = li.querySelector('.memo-trigger-label');
+    const memoPopup = li.querySelector('.memo-popup');
+    const memoEdit = li.querySelector('.memo-edit');
+    const memoTextarea = li.querySelector('.memo-textarea');
+    const memoCategorySelect = li.querySelector('.memo-category-select');
+
+    memoLabel.textContent = item.memo ? '📝 메모' : '+ 메모';
+    memoPopup.textContent = item.memo || '';
+    buildCategoryOptions(memoCategorySelect, item.category || '');
+
+    memoTrigger.addEventListener('click', () => {
+      memoTextarea.value = item.memo || '';
+      buildCategoryOptions(memoCategorySelect, item.category || '');
+      memoEdit.classList.toggle('hidden');
+      if (!memoEdit.classList.contains('hidden')) memoTextarea.focus();
+    });
+    li.querySelector('.memo-cancel-btn').addEventListener('click', () => {
+      memoEdit.classList.add('hidden');
+    });
+    li.querySelector('.memo-save-btn').addEventListener('click', () => {
+      handlers.onSaveMemo(item, memoTextarea.value.trim(), memoCategorySelect.value || null);
+    });
+  }
+
   // ---- TODO ----
 
   function loadTodos() {
@@ -1224,84 +1528,352 @@
     renderTodos();
   }
 
+  // 오늘 날짜에 해당하는 달력 이벤트를 맨 위에 얹어 기존 TODO와 같은 목록으로 보여준다.
   function renderTodos() {
-    const todos = loadTodos().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const todayStr = getTodayStr();
+    const todos = loadTodos()
+      .map((t) => ({ ...t, __key: `todo:${t.id}`, __source: 'todo' }))
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const todayEvents = loadCalendarEvents()
+      .filter((ev) => ev.date === todayStr)
+      .map((ev) => ({ ...ev, __key: `cal:${ev.id}`, __source: 'calendar' }))
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-    if (!todos.length) {
+    const items = [...todayEvents, ...todos];
+
+    if (!items.length) {
       todoList.innerHTML = '<li class="todo-empty">할 일이 없습니다.</li>';
       return;
     }
 
-    todoList.innerHTML = todos.map((t) => `
-      <li class="todo-item" data-id="${t.id}">
-        <input type="checkbox" class="todo-check">
-        <div class="todo-body">
-          <div class="todo-text-row">
-            <span class="todo-text"></span>
-            <span class="category-tag"></span>
-            <span class="memo-trigger">
-              <span class="memo-trigger-label"></span>
-              <span class="memo-popup"></span>
-            </span>
-          </div>
-          <div class="todo-meta">생성 ${formatKoreanShort(t.createdAt)}</div>
-          <div class="memo-edit hidden">
-            <textarea class="memo-textarea" placeholder="상세 메모를 입력하세요"></textarea>
-            <div class="memo-edit-actions">
-              <label class="memo-category-label">카테고리 <select class="memo-category-select"></select></label>
-              <div class="memo-edit-buttons">
-                <button type="button" class="memo-cancel-btn">취소</button>
-                <button type="button" class="memo-save-btn">저장</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <button class="icon-btn danger delete-btn">삭제</button>
-      </li>
-    `).join('');
+    todoList.innerHTML = items
+      .map((item) => buildItemLi(item, item.__source === 'calendar' ? { badge: '📅 오늘' } : null))
+      .join('');
+
+    const handlers = {
+      onComplete: (item) => (item.__source === 'calendar' ? completeCalendarEvent(item.id) : completeTodo(item.id)),
+      onDelete: (item) => (item.__source === 'calendar' ? deleteCalendarEvent(item.id) : deleteTodo(item.id)),
+      onSaveMemo: (item, memo, category) =>
+        item.__source === 'calendar'
+          ? saveCalendarEventMemo(item.id, memo, category)
+          : saveTodoMemo(item.id, memo, category),
+    };
 
     todoList.querySelectorAll('.todo-item').forEach((li) => {
-      const id = li.getAttribute('data-id');
-      const todo = todos.find((t) => t.id === id);
-      li.querySelector('.todo-text').textContent = todo.text;
-      li.querySelector('.todo-check').addEventListener('change', (e) => {
-        if (e.target.checked) completeTodo(id);
-      });
-      bindDeleteConfirm(li.querySelector('.delete-btn'), () => deleteTodo(id));
-
-      const todoTag = li.querySelector('.category-tag');
-      todoTag.textContent = todo.category || '미분류';
-      applyCategoryTagColor(todoTag, todo.category);
-
-      const memoTrigger = li.querySelector('.memo-trigger');
-      const memoLabel = li.querySelector('.memo-trigger-label');
-      const memoPopup = li.querySelector('.memo-popup');
-      const memoEdit = li.querySelector('.memo-edit');
-      const memoTextarea = li.querySelector('.memo-textarea');
-      const memoCategorySelect = li.querySelector('.memo-category-select');
-
-      memoLabel.textContent = todo.memo ? '📝 메모' : '+ 메모';
-      memoPopup.textContent = todo.memo || '';
-      buildCategoryOptions(memoCategorySelect, todo.category || '');
-
-      memoTrigger.addEventListener('click', () => {
-        memoTextarea.value = todo.memo || '';
-        buildCategoryOptions(memoCategorySelect, todo.category || '');
-        memoEdit.classList.toggle('hidden');
-        if (!memoEdit.classList.contains('hidden')) memoTextarea.focus();
-      });
-      li.querySelector('.memo-cancel-btn').addEventListener('click', () => {
-        memoEdit.classList.add('hidden');
-      });
-      li.querySelector('.memo-save-btn').addEventListener('click', () => {
-        saveTodoMemo(id, memoTextarea.value.trim(), memoCategorySelect.value || null);
-      });
+      const item = items.find((it) => it.__key === li.getAttribute('data-key'));
+      if (item) bindItemLi(li, item, handlers);
     });
   }
 
   todoAddBtn.addEventListener('click', addTodo);
   todoInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addTodo();
+  });
+
+  // ---- 데일리 업무 (날짜가 바뀌면 자동으로 다시 나타나는 반복 업무) ----
+
+  const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+  const DAILY_STORAGE_KEY = 'workLog.dailyTemplates';
+  const DAILY_COMPLETIONS_KEY = 'workLog.dailyCompletions';
+
+  function loadDailyTemplates() {
+    try {
+      return JSON.parse(localStorage.getItem(DAILY_STORAGE_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveDailyTemplates(templates) {
+    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(templates));
+  }
+
+  function loadDailyCompletions() {
+    try {
+      return JSON.parse(localStorage.getItem(DAILY_COMPLETIONS_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveDailyCompletions(completions) {
+    localStorage.setItem(DAILY_COMPLETIONS_KEY, JSON.stringify(completions));
+  }
+
+  function addDailyTemplate() {
+    const text = dailyInput.value.trim();
+    if (!text) {
+      dailyInput.focus();
+      return;
+    }
+    const frequency = dailyFrequencyInput.value;
+    const weekday = frequency === 'weekly' ? parseInt(dailyWeekdayInput.value, 10) : null;
+    const templates = loadDailyTemplates();
+    templates.push({
+      id: crypto.randomUUID(),
+      text,
+      memo: '',
+      category: dailyCategoryInput.value || null,
+      frequency,
+      weekday,
+      createdAt: new Date().toISOString(),
+    });
+    saveDailyTemplates(templates);
+    dailyInput.value = '';
+    dailyCategoryInput.value = '';
+    dailyInput.focus();
+    renderDaily();
+  }
+
+  // 완료 시 업무일지로 이관 + 오늘 날짜로 완료 기록. 이 기록이 없는 날엔 다시 나타나므로
+  // 별도의 "재생성" 로직 없이 날짜 기준 필터만으로 매일/매주 반복이 구현된다.
+  function completeDailyToday(id) {
+    const templates = loadDailyTemplates();
+    const template = templates.find((t) => t.id === id);
+    if (!template) return;
+
+    const nowIso = new Date().toISOString();
+    const entries = loadEntries();
+    entries.push({
+      id: crypto.randomUUID(),
+      content: template.memo ? `${template.text}\n\n${template.memo}` : template.text,
+      start: nowIso,
+      end: null,
+      category: template.category || null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+    saveEntries(entries);
+
+    const completions = loadDailyCompletions();
+    completions.push({ templateId: id, date: getTodayStr() });
+    saveDailyCompletions(completions);
+
+    renderDaily();
+    render();
+  }
+
+  function deleteDailyTemplate(id) {
+    saveDailyTemplates(loadDailyTemplates().filter((t) => t.id !== id));
+    saveDailyCompletions(loadDailyCompletions().filter((c) => c.templateId !== id));
+    renderDaily();
+  }
+
+  function saveDailyMemo(id, memo, category) {
+    saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === id ? { ...t, memo, category } : t)));
+    renderDaily();
+  }
+
+  function renderDaily() {
+    const todayStr = getTodayStr();
+    const todayWeekday = new Date().getDay();
+    const templates = loadDailyTemplates();
+    const completedTodayIds = new Set(
+      loadDailyCompletions().filter((c) => c.date === todayStr).map((c) => c.templateId)
+    );
+
+    const active = templates
+      .filter((t) => (t.frequency === 'daily' || t.weekday === todayWeekday) && !completedTodayIds.has(t.id))
+      .map((t) => ({ ...t, __key: `daily:${t.id}` }))
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    if (!active.length) {
+      dailyList.innerHTML = '<li class="todo-empty">오늘의 데일리 업무가 없습니다.</li>';
+      return;
+    }
+
+    dailyList.innerHTML = active
+      .map((item) =>
+        buildItemLi(item, { badge: item.frequency === 'weekly' ? `매주 ${WEEKDAY_LABELS[item.weekday]}` : '매일' })
+      )
+      .join('');
+
+    const handlers = {
+      onComplete: (item) => completeDailyToday(item.id),
+      onDelete: (item) => deleteDailyTemplate(item.id),
+      onSaveMemo: (item, memo, category) => saveDailyMemo(item.id, memo, category),
+    };
+
+    dailyList.querySelectorAll('.todo-item').forEach((li) => {
+      const item = active.find((it) => it.__key === li.getAttribute('data-key'));
+      if (item) bindItemLi(li, item, handlers);
+    });
+  }
+
+  function refreshDailyCategoryInput() {
+    buildCategoryOptions(dailyCategoryInput, dailyCategoryInput.value);
+  }
+
+  dailyFrequencyInput.addEventListener('change', () => {
+    dailyWeekdayInput.classList.toggle('hidden', dailyFrequencyInput.value !== 'weekly');
+    if (dailyFrequencyInput.value === 'weekly') dailyWeekdayInput.value = String(new Date().getDay());
+  });
+  dailyAddBtn.addEventListener('click', addDailyTemplate);
+  dailyInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addDailyTemplate();
+  });
+
+  // ---- 달력 (특정 날짜에 할 일을 걸어두면 그날 TODO 목록 맨 위에 표시) ----
+
+  const CALENDAR_STORAGE_KEY = 'workLog.calendarEvents';
+
+  function loadCalendarEvents() {
+    try {
+      return JSON.parse(localStorage.getItem(CALENDAR_STORAGE_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveCalendarEvents(events) {
+    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(events));
+  }
+
+  function addCalendarEvent() {
+    const date = calDateInput.value;
+    const text = calTextInput.value.trim();
+    if (!date || !text) {
+      (date ? calTextInput : calDateInput).focus();
+      return;
+    }
+    const events = loadCalendarEvents();
+    events.push({
+      id: crypto.randomUUID(),
+      text,
+      memo: '',
+      category: null,
+      date,
+      createdAt: new Date().toISOString(),
+    });
+    saveCalendarEvents(events);
+    calTextInput.value = '';
+    renderCalendar();
+    renderTodos();
+  }
+
+  function completeCalendarEvent(id) {
+    const events = loadCalendarEvents();
+    const ev = events.find((e) => e.id === id);
+    if (!ev) return;
+    const nowIso = new Date().toISOString();
+    const entries = loadEntries();
+    entries.push({
+      id: crypto.randomUUID(),
+      content: ev.memo ? `${ev.text}\n\n${ev.memo}` : ev.text,
+      start: nowIso,
+      end: null,
+      category: ev.category || null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+    saveEntries(entries);
+    saveCalendarEvents(events.filter((e) => e.id !== id));
+    renderCalendar();
+    renderTodos();
+    render();
+  }
+
+  function deleteCalendarEvent(id) {
+    saveCalendarEvents(loadCalendarEvents().filter((e) => e.id !== id));
+    renderCalendar();
+    renderTodos();
+  }
+
+  function saveCalendarEventMemo(id, memo, category) {
+    saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === id ? { ...e, memo, category } : e)));
+    renderCalendar();
+    renderTodos();
+  }
+
+  function renderCalendar() {
+    const year = calViewDate.getFullYear();
+    const month = calViewDate.getMonth();
+    calTitle.textContent = `${year}년 ${month + 1}월`;
+
+    const todayStr = getTodayStr();
+    const eventsByDate = {};
+    loadCalendarEvents().forEach((ev) => {
+      (eventsByDate[ev.date] = eventsByDate[ev.date] || []).push(ev);
+    });
+
+    const startWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const pad = (n) => String(n).padStart(2, '0');
+
+    calGrid.innerHTML = '';
+    WEEKDAY_LABELS.forEach((label) => {
+      const el = document.createElement('div');
+      el.className = 'calendar-weekday';
+      el.textContent = label;
+      calGrid.appendChild(el);
+    });
+
+    for (let i = 0; i < startWeekday; i++) {
+      const el = document.createElement('div');
+      el.className = 'calendar-day empty';
+      calGrid.appendChild(el);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+      const dayEvents = eventsByDate[dateStr] || [];
+
+      const cell = document.createElement('div');
+      cell.className = 'calendar-day';
+      if (dateStr === todayStr) cell.classList.add('today');
+      if (dayEvents.length) cell.classList.add('has-events');
+
+      const numberEl = document.createElement('span');
+      numberEl.textContent = String(day);
+      cell.appendChild(numberEl);
+
+      if (dayEvents.length) {
+        const dot = document.createElement('span');
+        dot.className = 'day-dot';
+        cell.appendChild(dot);
+
+        const popup = document.createElement('div');
+        popup.className = 'day-popup';
+        dayEvents.forEach((ev) => {
+          const row = document.createElement('div');
+          row.className = 'day-popup-item';
+          const textEl = document.createElement('span');
+          textEl.className = 'day-popup-text';
+          textEl.textContent = ev.text;
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = '×';
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteCalendarEvent(ev.id);
+          });
+          row.appendChild(textEl);
+          row.appendChild(delBtn);
+          popup.appendChild(row);
+        });
+        cell.appendChild(popup);
+      }
+
+      cell.addEventListener('click', () => {
+        calDateInput.value = dateStr;
+        calTextInput.focus();
+      });
+
+      calGrid.appendChild(cell);
+    }
+  }
+
+  calPrevBtn.addEventListener('click', () => {
+    calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  calNextBtn.addEventListener('click', () => {
+    calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1);
+    renderCalendar();
+  });
+  calAddBtn.addEventListener('click', addCalendarEvent);
+  calTextInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addCalendarEvent();
   });
 
   // ---- 항상 위 고정 (Document Picture-in-Picture) ----
@@ -1534,6 +2106,10 @@
       entries: loadEntries(),
       todos: loadTodos(),
       categories: loadCategories(),
+      categoryColors: loadCategoryColorMap(),
+      dailyTemplates: loadDailyTemplates(),
+      dailyCompletions: loadDailyCompletions(),
+      calendarEvents: loadCalendarEvents(),
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1575,12 +2151,34 @@
         if (Array.isArray(data.categories) && data.categories.length) {
           saveCategories(Array.from(new Set([...loadCategories(), ...data.categories])));
         }
+        if (data.categoryColors && typeof data.categoryColors === 'object') {
+          saveCategoryColorMap({ ...loadCategoryColorMap(), ...data.categoryColors });
+        }
+        if (Array.isArray(data.dailyTemplates)) {
+          const existing = loadDailyTemplates();
+          const existingIds = new Set(existing.map((t) => t.id));
+          saveDailyTemplates([...existing, ...data.dailyTemplates.filter((t) => !existingIds.has(t.id))]);
+        }
+        if (Array.isArray(data.dailyCompletions)) {
+          const existing = loadDailyCompletions();
+          const existingKeys = new Set(existing.map((c) => `${c.templateId}:${c.date}`));
+          const incoming = data.dailyCompletions.filter((c) => !existingKeys.has(`${c.templateId}:${c.date}`));
+          saveDailyCompletions([...existing, ...incoming]);
+        }
+        if (Array.isArray(data.calendarEvents)) {
+          const existing = loadCalendarEvents();
+          const existingIds = new Set(existing.map((e) => e.id));
+          saveCalendarEvents([...existing, ...data.calendarEvents.filter((e) => !existingIds.has(e.id))]);
+        }
 
         renderCategorySelect();
         refreshTodoCategoryInput();
         refreshSearchCategoryInput();
+        refreshDailyCategoryInput();
         render();
         renderTodos();
+        renderDaily();
+        renderCalendar();
         showIoStatus(`백업 업로드 완료 (업무일지 ${addedEntries}건, TODO ${addedTodos}건 추가)`);
       } catch {
         showIoStatus('백업 업로드 실패: JSON 파일 형식을 확인해주세요.');
@@ -1594,6 +2192,7 @@
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       render();
       renderTodos();
+      renderDaily();
     });
   }
 
@@ -1601,8 +2200,12 @@
   resetForm();
   refreshTodoCategoryInput();
   refreshSearchCategoryInput();
+  refreshDailyCategoryInput();
+  calDateInput.value = getTodayStr();
   render();
   renderTodos();
+  renderDaily();
+  renderCalendar();
 })();
 </script>
 </body>
