@@ -815,7 +815,7 @@
 <div class="right-col">
   <section class="daily-card">
     <div class="daily-header">
-      <h2>🔁 데일리 업무</h2>
+      <h2>🔁 Daily 업무</h2>
     </div>
     <div class="daily-input-row">
       <input type="text" id="dailyInput" placeholder="매일/매주 할 일을 입력하세요">
@@ -1678,7 +1678,7 @@
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
     if (!active.length) {
-      dailyList.innerHTML = '<li class="todo-empty">오늘의 데일리 업무가 없습니다.</li>';
+      dailyList.innerHTML = '<li class="todo-empty">오늘의 Daily 업무가 없습니다.</li>';
       return;
     }
 
