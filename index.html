@@ -12,8 +12,10 @@
     --note-border: #f0e6b8;
     --text: #1f2328;
     --text-muted: #6b7280;
-    --accent: #f5b400;
-    --accent-dark: #d99a00;
+    --accent: #6c5ce0;
+    --accent-dark: #5b3fd6;
+    --accent-text: #ffffff;
+    --accent-wash: #efecfd;
     --danger: #ef4444;
     --border: #e5e7eb;
     --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
@@ -26,8 +28,10 @@
       --note-border: #3a3626;
       --text: #e8e9ec;
       --text-muted: #9a9ea5;
-      --accent: #f5b400;
-      --accent-dark: #ffcc33;
+      --accent: #6c5ce0;
+      --accent-dark: #b8a6ff;
+      --accent-text: #ffffff;
+      --accent-wash: #2a2545;
       --danger: #f87171;
       --border: #2e3036;
       --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
@@ -35,12 +39,14 @@
   }
   :root[data-theme="dark"] {
     --bg: #17181c; --card-bg: #1f2126; --note-bg: #262820; --note-border: #3a3626;
-    --text: #e8e9ec; --text-muted: #9a9ea5; --accent: #f5b400; --accent-dark: #ffcc33;
+    --text: #e8e9ec; --text-muted: #9a9ea5; --accent: #6c5ce0; --accent-dark: #b8a6ff;
+    --accent-text: #ffffff; --accent-wash: #2a2545;
     --danger: #f87171; --border: #2e3036; --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
   }
   :root[data-theme="light"] {
     --bg: #f4f5f7; --card-bg: #ffffff; --note-bg: #fffdf4; --note-border: #f0e6b8;
-    --text: #1f2328; --text-muted: #6b7280; --accent: #f5b400; --accent-dark: #d99a00;
+    --text: #1f2328; --text-muted: #6b7280; --accent: #6c5ce0; --accent-dark: #5b3fd6;
+    --accent-text: #ffffff; --accent-wash: #efecfd;
     --danger: #ef4444; --border: #e5e7eb; --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   }
   * { box-sizing: border-box; }
@@ -82,7 +88,7 @@
   .form-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 18px;
     box-shadow: var(--shadow);
     margin-bottom: 28px;
@@ -138,7 +144,7 @@
     transition: opacity .15s;
   }
   button:hover { opacity: 0.85; }
-  #saveBtn { background: var(--accent); color: #1f2328; }
+  #saveBtn { background: var(--accent); color: var(--accent-text); }
   #cancelEditBtn { background: var(--border); color: var(--text); }
   .entry-list { display: flex; flex-direction: column; gap: 14px; }
   .entry-card {
@@ -189,7 +195,7 @@
   .todo-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 18px;
     box-shadow: var(--shadow);
     margin-bottom: 28px;
@@ -239,7 +245,7 @@
     background: var(--card-bg);
     color: var(--text);
   }
-  #todoAddBtn { background: var(--accent); color: #1f2328; padding: 8px 16px; }
+  #todoAddBtn { background: var(--accent); color: var(--accent-text); padding: 8px 16px; }
   .todo-list {
     list-style: none;
     margin: 12px 0 0;
@@ -344,7 +350,7 @@
   }
   .memo-edit-actions .memo-edit-buttons { display: flex; gap: 6px; }
   .memo-edit-actions button { padding: 5px 12px; font-size: 12px; }
-  .memo-save-btn { background: var(--accent); color: #1f2328; }
+  .memo-save-btn { background: var(--accent); color: var(--accent-text); }
   .memo-cancel-btn { background: var(--border); color: var(--text); }
   .todo-item .todo-meta {
     font-size: 11px;
@@ -471,7 +477,7 @@
     background: transparent;
     color: var(--text);
   }
-  .category-add-row button { padding: 6px 14px; font-size: 12.5px; background: var(--accent); color: #1f2328; }
+  .category-add-row button { padding: 6px 14px; font-size: 12.5px; background: var(--accent); color: var(--accent-text); }
   .meta-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .category-tag {
     background: var(--border);
@@ -494,7 +500,7 @@
   .summary-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 18px;
     box-shadow: var(--shadow);
     margin-bottom: 28px;
@@ -584,7 +590,7 @@
   .daily-card, .calendar-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 18px;
     box-shadow: var(--shadow);
     margin-bottom: 28px;
@@ -629,7 +635,7 @@
     background: var(--card-bg);
     color: var(--text);
   }
-  #dailyAddBtn { background: var(--accent); color: #1f2328; padding: 8px 16px; }
+  #dailyAddBtn { background: var(--accent); color: var(--accent-text); padding: 8px 16px; }
   .daily-tpl-list {
     margin-top: 14px;
     padding-top: 14px;
@@ -723,7 +729,7 @@
     gap: 6px;
   }
   .daily-tpl-edit-actions button { padding: 5px 12px; font-size: 12px; }
-  .daily-tpl-save-btn { background: var(--accent); color: #1f2328; }
+  .daily-tpl-save-btn { background: var(--accent); color: var(--accent-text); }
   .daily-tpl-cancel-btn { background: var(--border); color: var(--text); }
   .daily-tpl-empty {
     text-align: center;
@@ -767,7 +773,7 @@
   .calendar-day.empty { visibility: hidden; }
   .calendar-day.today {
     background: var(--accent);
-    color: #1f2328;
+    color: var(--accent-text);
     font-weight: 700;
   }
   .calendar-day.has-events:not(.today) { background: var(--bg); font-weight: 600; }
@@ -779,7 +785,7 @@
     border-radius: 50%;
     background: var(--accent-dark);
   }
-  .calendar-day.today .day-dot { background: #1f2328; }
+  .calendar-day.today .day-dot { background: var(--accent-text); }
   .calendar-day .day-popup {
     display: none;
     position: absolute;
@@ -857,7 +863,7 @@
     gap: 4px;
   }
   .day-popup-edit-actions button { padding: 3px 8px; font-size: 11px; }
-  .day-popup-save-btn { background: var(--accent); color: #1f2328; }
+  .day-popup-save-btn { background: var(--accent); color: var(--accent-text); }
   .day-popup-cancel-btn { background: var(--border); color: var(--text); }
   .calendar-add-row {
     display: flex;
@@ -893,13 +899,15 @@
     background: var(--card-bg);
     color: var(--text);
   }
-  #calAddBtn { background: var(--accent); color: #1f2328; padding: 7px 14px; }
+  #calAddBtn { background: var(--accent); color: var(--accent-text); padding: 7px 14px; }
   .todo-item .source-badge {
     font-size: 10px;
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0 4px;
+    font-weight: 600;
+    color: var(--accent-dark);
+    background: var(--accent-wash);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0 7px;
   }
 </style>
 </head>
