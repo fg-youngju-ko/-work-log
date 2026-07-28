@@ -592,9 +592,16 @@
   .daily-header, .calendar-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     margin-bottom: 12px;
   }
   .daily-header h2 { font-size: 15px; margin: 0; }
+  #dailyTemplateToggleBtn {
+    background: var(--border);
+    color: var(--text);
+    font-size: 12px;
+    padding: 5px 10px;
+  }
   .daily-input-row {
     display: flex;
     flex-wrap: wrap;
@@ -612,7 +619,8 @@
     background: transparent;
     color: var(--text);
   }
-  .daily-input-row select {
+  .daily-input-row select,
+  .daily-input-row input[type="time"] {
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 6px;
@@ -622,6 +630,107 @@
     color: var(--text);
   }
   #dailyAddBtn { background: var(--accent); color: #1f2328; padding: 8px 16px; }
+  .daily-tpl-list {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .daily-tpl-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .daily-tpl-view {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .daily-tpl-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+  }
+  .daily-tpl-schedule {
+    font-size: 11px;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 6px;
+  }
+  .daily-tpl-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .daily-tpl-actions button {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+  .daily-tpl-edit { margin-top: 8px; }
+  .daily-tpl-edit input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-family: inherit;
+    font-size: 13.5px;
+    background: transparent;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .daily-tpl-edit textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 50px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-family: inherit;
+    font-size: 13px;
+    background: transparent;
+    color: var(--text);
+    resize: vertical;
+    margin-bottom: 6px;
+  }
+  .daily-tpl-edit-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .daily-tpl-edit-row select,
+  .daily-tpl-edit-row input[type="time"] {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px;
+    font-family: inherit;
+    font-size: 12.5px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .daily-tpl-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .daily-tpl-edit-actions button { padding: 5px 12px; font-size: 12px; }
+  .daily-tpl-save-btn { background: var(--accent); color: #1f2328; }
+  .daily-tpl-cancel-btn { background: var(--border); color: var(--text); }
+  .daily-tpl-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 10px 0;
+  }
   .calendar-header {
     justify-content: space-between;
   }
@@ -848,6 +957,7 @@
   <section class="daily-card">
     <div class="daily-header">
       <h2>🔁 Daily 업무</h2>
+      <button type="button" id="dailyTemplateToggleBtn">📋 전체 목록</button>
     </div>
     <div class="daily-input-row">
       <input type="text" id="dailyInput" placeholder="매일/매주 할 일을 입력하세요">
@@ -864,10 +974,12 @@
         <option value="5">금</option>
         <option value="6">토</option>
       </select>
+      <input type="time" id="dailyTimeInput">
       <select id="dailyCategoryInput"></select>
       <button id="dailyAddBtn">추가</button>
     </div>
     <ul class="todo-list" id="dailyList"></ul>
+    <div class="daily-tpl-list hidden" id="dailyTemplateList"></div>
   </section>
 
   <section class="form-card">
@@ -959,9 +1071,12 @@
   const dailyInput = document.getElementById('dailyInput');
   const dailyFrequencyInput = document.getElementById('dailyFrequencyInput');
   const dailyWeekdayInput = document.getElementById('dailyWeekdayInput');
+  const dailyTimeInput = document.getElementById('dailyTimeInput');
   const dailyCategoryInput = document.getElementById('dailyCategoryInput');
   const dailyAddBtn = document.getElementById('dailyAddBtn');
   const dailyList = document.getElementById('dailyList');
+  const dailyTemplateToggleBtn = document.getElementById('dailyTemplateToggleBtn');
+  const dailyTemplateList = document.getElementById('dailyTemplateList');
 
   const calPrevBtn = document.getElementById('calPrevBtn');
   const calNextBtn = document.getElementById('calNextBtn');
@@ -1680,13 +1795,16 @@
       category: dailyCategoryInput.value || null,
       frequency,
       weekday,
+      time: dailyTimeInput.value || null,
       createdAt: new Date().toISOString(),
     });
     saveDailyTemplates(templates);
     dailyInput.value = '';
+    dailyTimeInput.value = '';
     dailyCategoryInput.value = '';
     dailyInput.focus();
     renderDaily();
+    renderDailyTemplateList();
   }
 
   // 완료 시 업무일지로 이관 + 오늘 날짜로 완료 기록. 이 기록이 없는 날엔 다시 나타나므로
@@ -1722,11 +1840,19 @@
     saveDailyTemplates(loadDailyTemplates().filter((t) => t.id !== id));
     saveDailyCompletions(loadDailyCompletions().filter((c) => c.templateId !== id));
     renderDaily();
+    renderDailyTemplateList();
   }
 
   function saveDailyMemo(id, memo, category) {
     saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === id ? { ...t, memo, category } : t)));
     renderDaily();
+    renderDailyTemplateList();
+  }
+
+  function updateDailyTemplate(id, updates) {
+    saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === id ? { ...t, ...updates } : t)));
+    renderDaily();
+    renderDailyTemplateList();
   }
 
   function renderDaily() {
@@ -1748,9 +1874,10 @@
     }
 
     dailyList.innerHTML = active
-      .map((item) =>
-        buildItemLi(item, { badge: item.frequency === 'weekly' ? `매주 ${WEEKDAY_LABELS[item.weekday]}` : '매일' })
-      )
+      .map((item) => {
+        const schedule = item.frequency === 'weekly' ? `매주 ${WEEKDAY_LABELS[item.weekday]}` : '매일';
+        return buildItemLi(item, { badge: item.time ? `${schedule} ${item.time}` : schedule });
+      })
       .join('');
 
     const handlers = {
@@ -1776,6 +1903,122 @@
   dailyAddBtn.addEventListener('click', addDailyTemplate);
   dailyInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addDailyTemplate();
+  });
+
+  function weekdayOptionsHtml() {
+    return WEEKDAY_LABELS.map((label, idx) => `<option value="${idx}">${label}</option>`).join('');
+  }
+
+  // 오늘 활성 목록(renderDaily)과 별개로, 요일/시간과 무관하게 등록된 모든 데일리
+  // 템플릿을 펼쳐 보고 요일/시간/내용/카테고리/메모를 한 번에 수정·삭제하는 패널.
+  function renderDailyTemplateList() {
+    const templates = loadDailyTemplates().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    if (!templates.length) {
+      dailyTemplateList.innerHTML = '<div class="daily-tpl-empty">등록된 데일리 업무가 없습니다.</div>';
+      return;
+    }
+
+    dailyTemplateList.innerHTML = templates.map((t) => `
+      <div class="daily-tpl-item" data-id="${t.id}">
+        <div class="daily-tpl-view">
+          <div class="daily-tpl-main">
+            <span class="daily-tpl-text"></span>
+            <span class="category-tag"></span>
+            <span class="daily-tpl-schedule"></span>
+          </div>
+          <div class="daily-tpl-actions">
+            <button type="button" class="daily-tpl-edit-btn">수정</button>
+            <button type="button" class="daily-tpl-del-btn">삭제</button>
+          </div>
+        </div>
+        <div class="daily-tpl-edit hidden">
+          <input type="text" class="daily-tpl-edit-text">
+          <textarea class="daily-tpl-edit-memo" placeholder="상세 메모"></textarea>
+          <div class="daily-tpl-edit-row">
+            <select class="daily-tpl-edit-frequency">
+              <option value="daily">매일</option>
+              <option value="weekly">매주</option>
+            </select>
+            <select class="daily-tpl-edit-weekday">${weekdayOptionsHtml()}</select>
+            <input type="time" class="daily-tpl-edit-time">
+            <select class="daily-tpl-edit-category"></select>
+          </div>
+          <div class="daily-tpl-edit-actions">
+            <button type="button" class="daily-tpl-cancel-btn">취소</button>
+            <button type="button" class="daily-tpl-save-btn">저장</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    dailyTemplateList.querySelectorAll('.daily-tpl-item').forEach((item) => {
+      const id = item.getAttribute('data-id');
+      const template = templates.find((t) => t.id === id);
+
+      item.querySelector('.daily-tpl-text').textContent = template.text;
+      const tagEl = item.querySelector('.category-tag');
+      tagEl.textContent = template.category || '미분류';
+      applyCategoryTagColor(tagEl, template.category);
+      const scheduleLabel = template.frequency === 'weekly' ? `매주 ${WEEKDAY_LABELS[template.weekday]}` : '매일';
+      item.querySelector('.daily-tpl-schedule').textContent = template.time
+        ? `${scheduleLabel} ${template.time}`
+        : scheduleLabel;
+
+      const view = item.querySelector('.daily-tpl-view');
+      const editRow = item.querySelector('.daily-tpl-edit');
+      const editText = item.querySelector('.daily-tpl-edit-text');
+      const editMemo = item.querySelector('.daily-tpl-edit-memo');
+      const editFrequency = item.querySelector('.daily-tpl-edit-frequency');
+      const editWeekday = item.querySelector('.daily-tpl-edit-weekday');
+      const editTime = item.querySelector('.daily-tpl-edit-time');
+      const editCategory = item.querySelector('.daily-tpl-edit-category');
+
+      editFrequency.addEventListener('change', () => {
+        editWeekday.classList.toggle('hidden', editFrequency.value !== 'weekly');
+      });
+
+      item.querySelector('.daily-tpl-edit-btn').addEventListener('click', () => {
+        editText.value = template.text;
+        editMemo.value = template.memo || '';
+        editFrequency.value = template.frequency;
+        editWeekday.value = String(template.weekday != null ? template.weekday : new Date().getDay());
+        editWeekday.classList.toggle('hidden', template.frequency !== 'weekly');
+        editTime.value = template.time || '';
+        buildCategoryOptions(editCategory, template.category || '');
+        view.classList.add('hidden');
+        editRow.classList.remove('hidden');
+        editText.focus();
+      });
+      item.querySelector('.daily-tpl-cancel-btn').addEventListener('click', () => {
+        editRow.classList.add('hidden');
+        view.classList.remove('hidden');
+      });
+      item.querySelector('.daily-tpl-save-btn').addEventListener('click', () => {
+        const text = editText.value.trim();
+        if (!text) {
+          editText.focus();
+          return;
+        }
+        const frequency = editFrequency.value;
+        const weekday = frequency === 'weekly' ? parseInt(editWeekday.value, 10) : null;
+        updateDailyTemplate(id, {
+          text,
+          memo: editMemo.value.trim(),
+          category: editCategory.value || null,
+          frequency,
+          weekday,
+          time: editTime.value || null,
+        });
+      });
+      bindDeleteConfirm(item.querySelector('.daily-tpl-del-btn'), () => deleteDailyTemplate(id));
+    });
+  }
+
+  dailyTemplateToggleBtn.addEventListener('click', () => {
+    const willShow = dailyTemplateList.classList.contains('hidden');
+    dailyTemplateList.classList.toggle('hidden');
+    if (willShow) renderDailyTemplateList();
   });
 
   // ---- 달력 (특정 날짜에 할 일을 걸어두면 그날 TODO 목록 맨 위에 표시) ----
