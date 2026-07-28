@@ -61,11 +61,6 @@
   }
   .left-col, .right-col { min-width: 0; }
   .app-header { grid-column: 1 / -1; }
-  .top-left, .top-right { min-width: 0; }
-  .top-left > .todo-card,
-  .top-right > .daily-card {
-    margin-bottom: 0;
-  }
   @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; max-width: 720px; }
     .app-header { grid-column: 1; }
@@ -694,24 +689,67 @@
     text-align: left;
     cursor: default;
   }
-  .calendar-day.has-events:hover .day-popup { display: block; }
+  .calendar-day.has-events:hover .day-popup,
+  .calendar-day.popup-open .day-popup { display: block; }
   .day-popup-item {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .day-popup-item:last-child { border-bottom: none; }
+  .day-popup-view {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 6px;
+  }
+  .day-popup-text {
     font-size: 12px;
     color: var(--text);
-    padding: 3px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
-  .day-popup-item .day-popup-text { white-space: pre-wrap; word-break: break-word; }
-  .day-popup-item button {
+  .day-popup-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .day-popup-actions button {
     background: transparent;
     color: var(--text-muted);
     padding: 0 4px;
     font-size: 11px;
-    flex-shrink: 0;
   }
+  .day-popup-edit { margin-top: 4px; }
+  .day-popup-edit input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .day-popup-edit select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 4px;
+    font-family: inherit;
+    font-size: 11.5px;
+    background: var(--card-bg);
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .day-popup-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .day-popup-edit-actions button { padding: 3px 8px; font-size: 11px; }
+  .day-popup-save-btn { background: var(--accent); color: #1f2328; }
+  .day-popup-cancel-btn { background: var(--border); color: var(--text); }
   .calendar-add-row {
     display: flex;
     flex-wrap: wrap;
@@ -772,7 +810,7 @@
   </div>
 </div>
 
-<div class="top-left">
+<div class="left-col">
   <section class="todo-card" id="todoSection">
     <div class="todo-header">
       <h2>✅ TODO</h2>
@@ -787,9 +825,26 @@
     <div class="todo-hint" id="pipHint"></div>
   </section>
   <div class="todo-placeholder hidden" id="todoPlaceholder">📌 TODO 목록이 고정 창에 표시되고 있습니다.</div>
+
+  <section class="summary-card" id="summarySection">
+    <div class="summary-header">
+      <h2>📅 이번 주 요약</h2>
+      <span class="summary-range" id="summaryRange"></span>
+    </div>
+    <div id="summaryBody"></div>
+  </section>
+
+  <div class="search-row">
+    <input type="text" id="searchInput" placeholder="🔍 검색어 (내용/카테고리)">
+    <select id="searchCategoryInput"></select>
+    <input type="date" id="searchDateInput">
+    <button type="button" id="resetSearchBtn">초기화</button>
+  </div>
+
+  <section class="entry-list" id="entryList"></section>
 </div>
 
-<div class="top-right">
+<div class="right-col">
   <section class="daily-card">
     <div class="daily-header">
       <h2>🔁 Daily 업무</h2>
@@ -814,28 +869,7 @@
     </div>
     <ul class="todo-list" id="dailyList"></ul>
   </section>
-</div>
 
-<div class="left-col">
-  <section class="summary-card" id="summarySection">
-    <div class="summary-header">
-      <h2>📅 이번 주 요약</h2>
-      <span class="summary-range" id="summaryRange"></span>
-    </div>
-    <div id="summaryBody"></div>
-  </section>
-
-  <div class="search-row">
-    <input type="text" id="searchInput" placeholder="🔍 검색어 (내용/카테고리)">
-    <select id="searchCategoryInput"></select>
-    <input type="date" id="searchDateInput">
-    <button type="button" id="resetSearchBtn">초기화</button>
-  </div>
-
-  <section class="entry-list" id="entryList"></section>
-</div>
-
-<div class="right-col">
   <section class="form-card">
     <textarea id="contentInput" placeholder="오늘 한 업무를 입력하세요..."></textarea>
     <div class="datetime-row">
@@ -938,6 +972,7 @@
   const calCategoryInput = document.getElementById('calCategoryInput');
   const calAddBtn = document.getElementById('calAddBtn');
   let calViewDate = new Date();
+  let openCalendarDate = null;
 
   let editingId = null;
   let pipWindow = null;
@@ -1816,6 +1851,13 @@
     renderTodos();
   }
 
+  function saveCalendarEventText(id, text, category) {
+    if (!text) return;
+    saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === id ? { ...e, text, category } : e)));
+    renderCalendar();
+    renderTodos();
+  }
+
   function renderCalendar() {
     const year = calViewDate.getFullYear();
     const month = calViewDate.getMonth();
@@ -1853,6 +1895,7 @@
       cell.className = 'calendar-day';
       if (dateStr === todayStr) cell.classList.add('today');
       if (dayEvents.length) cell.classList.add('has-events');
+      if (dateStr === openCalendarDate) cell.classList.add('popup-open');
 
       const numberEl = document.createElement('span');
       numberEl.textContent = String(day);
@@ -1865,22 +1908,71 @@
 
         const popup = document.createElement('div');
         popup.className = 'day-popup';
+        // 팝업 안 클릭은 날짜 셀의 클릭(핀 토글/날짜입력 갱신)으로 전파되지 않게 막는다.
+        popup.addEventListener('click', (e) => e.stopPropagation());
+
         dayEvents.forEach((ev) => {
-          const row = document.createElement('div');
-          row.className = 'day-popup-item';
+          const item = document.createElement('div');
+          item.className = 'day-popup-item';
+
+          const view = document.createElement('div');
+          view.className = 'day-popup-view';
           const textEl = document.createElement('span');
           textEl.className = 'day-popup-text';
           textEl.textContent = ev.text;
+          const actions = document.createElement('div');
+          actions.className = 'day-popup-actions';
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.textContent = '수정';
           const delBtn = document.createElement('button');
           delBtn.type = 'button';
           delBtn.textContent = '×';
-          delBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteCalendarEvent(ev.id);
+          actions.appendChild(editBtn);
+          actions.appendChild(delBtn);
+          view.appendChild(textEl);
+          view.appendChild(actions);
+
+          const editRow = document.createElement('div');
+          editRow.className = 'day-popup-edit hidden';
+          const editInput = document.createElement('input');
+          editInput.type = 'text';
+          const editCategory = document.createElement('select');
+          const editActions = document.createElement('div');
+          editActions.className = 'day-popup-edit-actions';
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.className = 'day-popup-cancel-btn';
+          cancelBtn.textContent = '취소';
+          const saveBtn = document.createElement('button');
+          saveBtn.type = 'button';
+          saveBtn.className = 'day-popup-save-btn';
+          saveBtn.textContent = '저장';
+          editActions.appendChild(cancelBtn);
+          editActions.appendChild(saveBtn);
+          editRow.appendChild(editInput);
+          editRow.appendChild(editCategory);
+          editRow.appendChild(editActions);
+
+          editBtn.addEventListener('click', () => {
+            editInput.value = ev.text;
+            buildCategoryOptions(editCategory, ev.category || '');
+            view.classList.add('hidden');
+            editRow.classList.remove('hidden');
+            editInput.focus();
           });
-          row.appendChild(textEl);
-          row.appendChild(delBtn);
-          popup.appendChild(row);
+          cancelBtn.addEventListener('click', () => {
+            editRow.classList.add('hidden');
+            view.classList.remove('hidden');
+          });
+          saveBtn.addEventListener('click', () => {
+            saveCalendarEventText(ev.id, editInput.value.trim(), editCategory.value || null);
+          });
+          delBtn.addEventListener('click', () => deleteCalendarEvent(ev.id));
+
+          item.appendChild(view);
+          item.appendChild(editRow);
+          popup.appendChild(item);
         });
         cell.appendChild(popup);
       }
@@ -1888,6 +1980,10 @@
       cell.addEventListener('click', () => {
         calDateInput.value = dateStr;
         calTextInput.focus();
+        if (dayEvents.length) {
+          openCalendarDate = openCalendarDate === dateStr ? null : dateStr;
+          renderCalendar();
+        }
       });
 
       calGrid.appendChild(cell);
@@ -1905,6 +2001,13 @@
   calAddBtn.addEventListener('click', addCalendarEvent);
   calTextInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addCalendarEvent();
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.calendar-day')) return;
+    if (openCalendarDate !== null) {
+      openCalendarDate = null;
+      renderCalendar();
+    }
   });
 
   // ---- 항상 위 고정 (Document Picture-in-Picture) ----
