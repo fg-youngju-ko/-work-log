@@ -60,8 +60,28 @@
     align-items: start;
   }
   .left-col, .right-col { min-width: 0; }
+  .app-header { grid-column: 1 / -1; }
+  .top-left, .top-right {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    min-width: 0;
+  }
+  .top-left > .todo-card,
+  .top-right > .daily-card {
+    flex: 1;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .top-left .todo-list,
+  .top-right .todo-list {
+    flex: 1;
+    overflow-y: auto;
+  }
   @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; max-width: 720px; }
+    .app-header { grid-column: 1; }
   }
   header {
     display: flex;
@@ -730,6 +750,15 @@
     background: transparent;
     color: var(--text);
   }
+  .calendar-add-row select {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 6px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
   #calAddBtn { background: var(--accent); color: #1f2328; padding: 7px 14px; }
   .todo-item .source-badge {
     font-size: 10px;
@@ -742,7 +771,7 @@
 </head>
 <body>
 <div class="app">
-<div class="left-col">
+<div class="app-header">
   <header>
     <h1>📝 업무일지</h1>
     <span class="count" id="entryCount"></span>
@@ -754,7 +783,9 @@
     <input type="file" id="importFile" accept="application/json" class="hidden">
     <span class="io-status" id="ioStatus"></span>
   </div>
+</div>
 
+<div class="top-left">
   <section class="todo-card" id="todoSection">
     <div class="todo-header">
       <h2>✅ TODO</h2>
@@ -769,50 +800,9 @@
     <div class="todo-hint" id="pipHint"></div>
   </section>
   <div class="todo-placeholder hidden" id="todoPlaceholder">📌 TODO 목록이 고정 창에 표시되고 있습니다.</div>
-
-  <section class="form-card">
-    <textarea id="contentInput" placeholder="오늘 한 업무를 입력하세요..."></textarea>
-    <div class="datetime-row">
-      <label>시작 <input type="datetime-local" id="startInput"></label>
-      <label><input type="checkbox" id="rangeToggle"> 기간으로 설정</label>
-      <label id="endLabel" class="hidden">종료 <input type="datetime-local" id="endInput"></label>
-    </div>
-    <div class="category-row">
-      <label>카테고리 <select id="categoryInput"></select></label>
-      <button type="button" class="category-manage-btn" id="categoryManageBtn">카테고리 관리</button>
-    </div>
-    <div class="category-panel hidden" id="categoryPanel">
-      <div class="category-chip-list" id="categoryChipList"></div>
-      <div class="category-add-row">
-        <input type="text" id="newCategoryInput" placeholder="새 카테고리 이름">
-        <button type="button" id="addCategoryBtn">추가</button>
-      </div>
-    </div>
-    <div class="actions">
-      <button id="cancelEditBtn" class="hidden">취소</button>
-      <button id="saveBtn">저장</button>
-    </div>
-  </section>
-
-  <section class="summary-card" id="summarySection">
-    <div class="summary-header">
-      <h2>📅 이번 주 요약</h2>
-      <span class="summary-range" id="summaryRange"></span>
-    </div>
-    <div id="summaryBody"></div>
-  </section>
-
-  <div class="search-row">
-    <input type="text" id="searchInput" placeholder="🔍 검색어 (내용/카테고리)">
-    <select id="searchCategoryInput"></select>
-    <input type="date" id="searchDateInput">
-    <button type="button" id="resetSearchBtn">초기화</button>
-  </div>
-
-  <section class="entry-list" id="entryList"></section>
 </div>
 
-<div class="right-col">
+<div class="top-right">
   <section class="daily-card">
     <div class="daily-header">
       <h2>🔁 Daily 업무</h2>
@@ -837,6 +827,51 @@
     </div>
     <ul class="todo-list" id="dailyList"></ul>
   </section>
+</div>
+
+<div class="left-col">
+  <section class="summary-card" id="summarySection">
+    <div class="summary-header">
+      <h2>📅 이번 주 요약</h2>
+      <span class="summary-range" id="summaryRange"></span>
+    </div>
+    <div id="summaryBody"></div>
+  </section>
+
+  <div class="search-row">
+    <input type="text" id="searchInput" placeholder="🔍 검색어 (내용/카테고리)">
+    <select id="searchCategoryInput"></select>
+    <input type="date" id="searchDateInput">
+    <button type="button" id="resetSearchBtn">초기화</button>
+  </div>
+
+  <section class="entry-list" id="entryList"></section>
+</div>
+
+<div class="right-col">
+  <section class="form-card">
+    <textarea id="contentInput" placeholder="오늘 한 업무를 입력하세요..."></textarea>
+    <div class="datetime-row">
+      <label>시작 <input type="datetime-local" id="startInput"></label>
+      <label><input type="checkbox" id="rangeToggle"> 기간으로 설정</label>
+      <label id="endLabel" class="hidden">종료 <input type="datetime-local" id="endInput"></label>
+    </div>
+    <div class="category-row">
+      <label>카테고리 <select id="categoryInput"></select></label>
+      <button type="button" class="category-manage-btn" id="categoryManageBtn">카테고리 관리</button>
+    </div>
+    <div class="category-panel hidden" id="categoryPanel">
+      <div class="category-chip-list" id="categoryChipList"></div>
+      <div class="category-add-row">
+        <input type="text" id="newCategoryInput" placeholder="새 카테고리 이름">
+        <button type="button" id="addCategoryBtn">추가</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="cancelEditBtn" class="hidden">취소</button>
+      <button id="saveBtn">저장</button>
+    </div>
+  </section>
 
   <section class="calendar-card">
     <div class="calendar-header">
@@ -848,6 +883,7 @@
     <div class="calendar-add-row">
       <input type="date" id="calDateInput">
       <input type="text" id="calTextInput" placeholder="해당 날짜에 할 일을 입력하세요">
+      <select id="calCategoryInput"></select>
       <button type="button" id="calAddBtn">추가</button>
     </div>
   </section>
@@ -912,6 +948,7 @@
   const calGrid = document.getElementById('calGrid');
   const calDateInput = document.getElementById('calDateInput');
   const calTextInput = document.getElementById('calTextInput');
+  const calCategoryInput = document.getElementById('calCategoryInput');
   const calAddBtn = document.getElementById('calAddBtn');
   let calViewDate = new Date();
 
@@ -1222,6 +1259,7 @@
     refreshTodoCategoryInput();
     refreshSearchCategoryInput();
     refreshDailyCategoryInput();
+    refreshCalCategoryInput();
     newCategoryInput.focus();
   }
 
@@ -1232,6 +1270,7 @@
     refreshTodoCategoryInput();
     refreshSearchCategoryInput();
     refreshDailyCategoryInput();
+    refreshCalCategoryInput();
   }
 
   categoryManageBtn.addEventListener('click', () => {
@@ -1741,14 +1780,19 @@
       id: crypto.randomUUID(),
       text,
       memo: '',
-      category: null,
+      category: calCategoryInput.value || null,
       date,
       createdAt: new Date().toISOString(),
     });
     saveCalendarEvents(events);
     calTextInput.value = '';
+    calCategoryInput.value = '';
     renderCalendar();
     renderTodos();
+  }
+
+  function refreshCalCategoryInput() {
+    buildCategoryOptions(calCategoryInput, calCategoryInput.value);
   }
 
   function completeCalendarEvent(id) {
@@ -2175,6 +2219,7 @@
         refreshTodoCategoryInput();
         refreshSearchCategoryInput();
         refreshDailyCategoryInput();
+        refreshCalCategoryInput();
         render();
         renderTodos();
         renderDaily();
@@ -2201,6 +2246,7 @@
   refreshTodoCategoryInput();
   refreshSearchCategoryInput();
   refreshDailyCategoryInput();
+  refreshCalCategoryInput();
   calDateInput.value = getTodayStr();
   render();
   renderTodos();
