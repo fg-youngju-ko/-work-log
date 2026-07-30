@@ -193,7 +193,9 @@
     cursor: grab;
   }
   .leaf.dragging { opacity: 0.35; }
-  .leaf-main { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .leaf-main { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+  .leaf-check-group { display: flex; align-items: flex-start; gap: 6px; flex: 1; min-width: 0; }
+  .leaf-check { margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
   .leaf-text { word-break: break-word; }
   .leaf-text.has-memo { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
   #floatingMemoPopup {
@@ -290,6 +292,7 @@
 <script>
 (function () {
   const TODO_STORAGE_KEY = 'workLog.todos';
+  const ENTRY_STORAGE_KEY = 'workLog.entries';
   const DAILY_STORAGE_KEY = 'workLog.dailyTemplates';
   const DAILY_COMPLETIONS_KEY = 'workLog.dailyCompletions';
   const CALENDAR_STORAGE_KEY = 'workLog.calendarEvents';
@@ -347,6 +350,12 @@
     floatingMemoPopup.style.display = 'none';
   }
 
+  function loadEntries() {
+    try { return JSON.parse(localStorage.getItem(ENTRY_STORAGE_KEY)) || []; } catch { return []; }
+  }
+  function saveEntries(entries) {
+    localStorage.setItem(ENTRY_STORAGE_KEY, JSON.stringify(entries));
+  }
   function loadTodos() {
     try { return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY)) || []; } catch { return []; }
   }
@@ -421,6 +430,37 @@
     if (item.__source === 'daily') {
       saveDailyTemplates(loadDailyTemplates().filter((t) => t.id !== item.id));
       saveDailyCompletions(loadDailyCompletions().filter((c) => c.templateId !== item.id));
+    } else if (item.__source === 'calendar') {
+      saveCalendarEvents(loadCalendarEvents().filter((e) => e.id !== item.id));
+    } else {
+      saveTodos(loadTodos().filter((t) => t.id !== item.id));
+    }
+    render();
+  }
+
+  // 체크 완료 시 index.html의 completeTodo/completeDailyToday/completeCalendarEvent와
+  // 동일하게 업무일지 항목을 생성한다. daily는 source:'daily' 태그를 남겨야
+  // index.html의 "메모 없는 daily는 주간요약 제외" 필터가 그대로 적용된다.
+  function completeItem(item) {
+    const nowIso = new Date().toISOString();
+    const entries = loadEntries();
+    const entry = {
+      id: crypto.randomUUID(),
+      content: item.memo ? `${item.text}\n\n${item.memo}` : item.text,
+      start: nowIso,
+      end: null,
+      category: item.category || null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    if (item.__source === 'daily') entry.source = 'daily';
+    entries.push(entry);
+    saveEntries(entries);
+
+    if (item.__source === 'daily') {
+      const completions = loadDailyCompletions();
+      completions.push({ templateId: item.id, date: getTodayStr() });
+      saveDailyCompletions(completions);
     } else if (item.__source === 'calendar') {
       saveCalendarEvents(loadCalendarEvents().filter((e) => e.id !== item.id));
     } else {
@@ -717,6 +757,15 @@
 
         const mainRow = document.createElement('div');
         mainRow.className = 'leaf-main';
+
+        const checkGroup = document.createElement('div');
+        checkGroup.className = 'leaf-check-group';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'leaf-check';
+        checkbox.addEventListener('change', (e) => {
+          if (e.target.checked) completeItem(item);
+        });
         const textEl = document.createElement('span');
         textEl.className = 'leaf-text';
         textEl.textContent = item.text;
@@ -725,12 +774,16 @@
           textEl.addEventListener('mouseenter', () => showMemoPopup(textEl, item.memo));
           textEl.addEventListener('mouseleave', hideMemoPopup);
         }
+        checkGroup.appendChild(checkbox);
+        checkGroup.appendChild(textEl);
+
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'leaf-del-btn';
         delBtn.textContent = '×';
         bindDeleteConfirm(delBtn, () => deleteItem(item));
-        mainRow.appendChild(textEl);
+
+        mainRow.appendChild(checkGroup);
         mainRow.appendChild(delBtn);
         leaf.appendChild(mainRow);
 
