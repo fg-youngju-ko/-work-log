@@ -185,29 +185,23 @@
   }
   .leaf.dragging { opacity: 0.35; }
   .leaf-main { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-  .leaf-text { position: relative; word-break: break-word; }
+  .leaf-text { word-break: break-word; }
   .leaf-text.has-memo { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
-  .leaf-text .memo-popup {
+  #floatingMemoPopup {
     display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    margin-bottom: 6px;
+    position: fixed;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
     box-shadow: var(--shadow);
     padding: 8px 10px;
-    width: max-content;
-    max-width: 220px;
+    max-width: 280px;
     white-space: pre-wrap;
     font-size: 12px;
-    font-weight: 400;
     color: var(--text);
-    z-index: 30;
-    cursor: default;
+    z-index: 1000;
+    pointer-events: none;
   }
-  .leaf-text.has-memo:hover .memo-popup { display: block; }
   .leaf-del-btn {
     background: transparent;
     border: none;
@@ -264,6 +258,7 @@
     카테고리는 항목 아래에 참고용 태그로만 표시됩니다(여기서는 수정 불가). 대제목의 ✎(수정)/×(삭제)는 헤더 우측에 있습니다.
   </p>
 </div>
+<div id="floatingMemoPopup"></div>
 
 <script>
 (function () {
@@ -296,6 +291,26 @@
   const connectorLayer = document.getElementById('connectorLayer');
   const hubNode = document.getElementById('hubNode');
   const branchRow = document.getElementById('branchRow');
+  const floatingMemoPopup = document.getElementById('floatingMemoPopup');
+
+  // 타일(.branch)이 overflow:hidden이라 자식으로 팝업을 두면 경계에서 잘리므로,
+  // body 바로 아래에 떠 있는 단일 팝업을 뷰포트 기준 좌표로 옮겨가며 재사용한다.
+  function showMemoPopup(triggerEl, memoText) {
+    floatingMemoPopup.textContent = memoText;
+    floatingMemoPopup.style.display = 'block';
+    const rect = triggerEl.getBoundingClientRect();
+    const popupRect = floatingMemoPopup.getBoundingClientRect();
+    let top = rect.top - popupRect.height - 8;
+    if (top < 8) top = rect.bottom + 8;
+    let left = rect.left;
+    const maxLeft = window.innerWidth - popupRect.width - 8;
+    if (left > maxLeft) left = Math.max(8, maxLeft);
+    floatingMemoPopup.style.top = `${top}px`;
+    floatingMemoPopup.style.left = `${left}px`;
+  }
+  function hideMemoPopup() {
+    floatingMemoPopup.style.display = 'none';
+  }
 
   function loadTodos() {
     try { return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY)) || []; } catch { return []; }
@@ -558,13 +573,11 @@
         mainRow.className = 'leaf-main';
         const textEl = document.createElement('span');
         textEl.className = 'leaf-text';
-        textEl.appendChild(document.createTextNode(t.text));
+        textEl.textContent = t.text;
         if (t.memo) {
           textEl.classList.add('has-memo');
-          const memoPopup = document.createElement('span');
-          memoPopup.className = 'memo-popup';
-          memoPopup.textContent = t.memo;
-          textEl.appendChild(memoPopup);
+          textEl.addEventListener('mouseenter', () => showMemoPopup(textEl, t.memo));
+          textEl.addEventListener('mouseleave', hideMemoPopup);
         }
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
