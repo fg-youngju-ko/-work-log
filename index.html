@@ -210,17 +210,16 @@
     font-size: 15px;
     margin: 0;
   }
-  #pipBtn {
-    background: var(--border);
-    color: var(--text);
-    font-size: 12.5px;
+  .mindmap-link {
+    background: var(--accent-wash);
+    color: var(--accent-dark);
+    font-size: 12px;
+    font-weight: 600;
     padding: 6px 12px;
+    border-radius: 999px;
+    text-decoration: none;
   }
-  .todo-hint {
-    font-size: 11.5px;
-    color: var(--text-muted);
-    margin-top: 6px;
-  }
+  .mindmap-link:hover { opacity: 0.85; }
   .todo-input-row {
     display: flex;
     gap: 8px;
@@ -365,11 +364,6 @@
     color: var(--text-muted);
     font-size: 13px;
     padding: 16px 0;
-  }
-  .todo-placeholder {
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 13px;
   }
   .category-row {
     display: flex;
@@ -952,7 +946,7 @@
   <section class="todo-card" id="todoSection">
     <div class="todo-header">
       <h2>✅ TODO</h2>
-      <button id="pipBtn">📌 항상 위 고정</button>
+      <a class="mindmap-link" href="mindmap.html">🧠 마인드맵</a>
     </div>
     <div class="todo-input-row">
       <input type="text" id="todoInput" placeholder="할 일을 입력하세요">
@@ -960,9 +954,7 @@
       <button id="todoAddBtn">추가</button>
     </div>
     <ul class="todo-list" id="todoList"></ul>
-    <div class="todo-hint" id="pipHint"></div>
   </section>
-  <div class="todo-placeholder hidden" id="todoPlaceholder">📌 TODO 목록이 고정 창에 표시되고 있습니다.</div>
 
   <section class="summary-card" id="summarySection">
     <div class="summary-header">
@@ -1075,14 +1067,10 @@
   const entryList = document.getElementById('entryList');
   const entryCount = document.getElementById('entryCount');
 
-  const todoSection = document.getElementById('todoSection');
-  const todoPlaceholder = document.getElementById('todoPlaceholder');
   const todoInput = document.getElementById('todoInput');
   const todoCategoryInput = document.getElementById('todoCategoryInput');
   const todoAddBtn = document.getElementById('todoAddBtn');
   const todoList = document.getElementById('todoList');
-  const pipBtn = document.getElementById('pipBtn');
-  const pipHint = document.getElementById('pipHint');
 
   const categoryInput = document.getElementById('categoryInput');
   const categoryManageBtn = document.getElementById('categoryManageBtn');
@@ -1130,7 +1118,6 @@
   let openCalendarDate = null;
 
   let editingId = null;
-  let pipWindow = null;
 
   function loadEntries() {
     try {
@@ -2318,53 +2305,6 @@
       renderCalendar();
     }
   });
-
-  // ---- 항상 위 고정 (Document Picture-in-Picture) ----
-
-  if (!('documentPictureInPicture' in window)) {
-    pipHint.textContent = '※ 항상 위 고정은 Chrome/Edge 최신 버전에서만 지원됩니다.';
-  }
-
-  async function openPip() {
-    if (!('documentPictureInPicture' in window)) {
-      alert('이 브라우저는 항상 위 고정 기능을 지원하지 않습니다. Chrome 또는 Edge 최신 버전에서 사용해 주세요.');
-      return;
-    }
-    pipWindow = await documentPictureInPicture.requestWindow({ width: 320, height: 420 });
-
-    [...document.styleSheets].forEach((styleSheet) => {
-      try {
-        const css = [...styleSheet.cssRules].map((r) => r.cssText).join('');
-        const style = document.createElement('style');
-        style.textContent = css;
-        pipWindow.document.head.appendChild(style);
-      } catch {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.type = styleSheet.type;
-        link.media = styleSheet.media;
-        link.href = styleSheet.href;
-        pipWindow.document.head.appendChild(link);
-      }
-    });
-    pipWindow.document.body.style.margin = '12px';
-    pipWindow.document.body.appendChild(todoSection);
-    todoPlaceholder.classList.remove('hidden');
-
-    pipBtn.textContent = '✕ 고정 해제';
-    pipBtn.onclick = () => pipWindow.close();
-
-    pipWindow.addEventListener('pagehide', () => {
-      todoPlaceholder.classList.add('hidden');
-      todoPlaceholder.insertAdjacentElement('beforebegin', todoSection);
-      pipBtn.textContent = '📌 항상 위 고정';
-      pipBtn.onclick = openPip;
-      pipWindow = null;
-      renderTodos();
-    }, { once: true });
-  }
-
-  pipBtn.addEventListener('click', openPip);
 
   function resetForm() {
     contentInput.value = '';

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TODO 마인드맵 - 업무일지</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --text: #1f2328;
+    --text-muted: #6b7280;
+    --accent: #6c5ce0;
+    --accent-dark: #5b3fd6;
+    --accent-text: #ffffff;
+    --accent-wash: #efecfd;
+    --danger: #ef4444;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181c;
+      --card-bg: #1f2126;
+      --text: #e8e9ec;
+      --text-muted: #9a9ea5;
+      --accent: #6c5ce0;
+      --accent-dark: #b8a6ff;
+      --accent-text: #ffffff;
+      --accent-wash: #2a2545;
+      --danger: #f87171;
+      --border: #2e3036;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181c; --card-bg: #1f2126; --text: #e8e9ec; --text-muted: #9a9ea5;
+    --accent: #6c5ce0; --accent-dark: #b8a6ff; --accent-text: #ffffff; --accent-wash: #2a2545;
+    --danger: #f87171; --border: #2e3036; --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f7; --card-bg: #ffffff; --text: #1f2328; --text-muted: #6b7280;
+    --accent: #6c5ce0; --accent-dark: #5b3fd6; --accent-text: #ffffff; --accent-wash: #efecfd;
+    --danger: #ef4444; --border: #e5e7eb; --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Pretendard", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app { max-width: 1100px; margin: 0 auto; padding: 32px 20px 80px; }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  .back-link {
+    background: var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .back-link:hover { opacity: 0.85; }
+  .add-branch-row { display: flex; gap: 8px; margin-bottom: 28px; }
+  .add-branch-row input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .add-branch-row button {
+    background: var(--accent);
+    color: var(--accent-text);
+    padding: 9px 18px;
+    border: none;
+    border-radius: 9px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .add-branch-row button:hover { opacity: 0.9; }
+  .mindmap-canvas { position: relative; }
+  .connector-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .connector-line { stroke: var(--border); stroke-width: 2; }
+  .hub {
+    position: relative;
+    z-index: 2;
+    width: 180px;
+    margin: 0 auto 56px;
+    padding: 22px 16px;
+    text-align: center;
+    background: var(--accent);
+    color: var(--accent-text);
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 15px;
+    box-shadow: var(--shadow);
+  }
+  .branch-row {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+  }
+  .branch {
+    width: 220px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .branch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 10px 12px;
+    font-weight: 700;
+    font-size: 13.5px;
+    background: var(--border);
+    color: var(--text);
+  }
+  .branch-title { word-break: break-word; }
+  .branch-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .branch-actions button {
+    background: transparent;
+    border: none;
+    padding: 2px 5px;
+    font-size: 12px;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.8;
+  }
+  .branch-actions button:hover { opacity: 1; }
+  .branch-actions button.confirming { background: rgba(0,0,0,0.15); border-radius: 4px; }
+  .branch-rename-input {
+    font: inherit;
+    font-weight: 700;
+    font-size: 13.5px;
+    border: none;
+    border-bottom: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    width: 110px;
+  }
+  .branch-leaves {
+    min-height: 56px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+  .branch-leaves.drag-over { background: var(--accent-wash); }
+  .leaf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 13px;
+    cursor: grab;
+  }
+  .leaf.dragging { opacity: 0.35; }
+  .leaf-text { word-break: break-word; }
+  .leaf-del-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 0 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .branch-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 6px 0;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🧠 TODO 마인드맵</h1>
+    <a class="back-link" href="index.html">← 업무일지로</a>
+  </header>
+
+  <div class="add-branch-row">
+    <input type="text" id="newBranchInput" placeholder="새 대제목(카테고리) 이름">
+    <button type="button" id="addBranchBtn">추가</button>
+  </div>
+
+  <div class="mindmap-canvas" id="mindmapCanvas">
+    <svg class="connector-layer" id="connectorLayer"></svg>
+    <div class="hub" id="hubNode">📋 전체 TODO</div>
+    <div class="branch-row" id="branchRow"></div>
+  </div>
+
+  <p class="hint">할 일을 드래그해서 다른 대제목으로 옮길 수 있습니다. 대제목의 ✎(수정)/×(삭제)는 헤더 우측에 있습니다.</p>
+</div>
+
+<script>
+(function () {
+  const TODO_STORAGE_KEY = 'workLog.todos';
+  const STORAGE_KEY = 'workLog.entries';
+  const CATEGORY_STORAGE_KEY = 'workLog.categories';
+  const CATEGORY_COLOR_MAP_KEY = 'workLog.categoryColors';
+  const DAILY_STORAGE_KEY = 'workLog.dailyTemplates';
+  const CALENDAR_STORAGE_KEY = 'workLog.calendarEvents';
+  const DEFAULT_CATEGORIES = ['회의', '개발', '문서·보고', '고객대응', '기타'];
+  const UNASSIGNED_KEY = '__unassigned__';
+
+  const CATEGORY_COLOR_SLOTS = [
+    { light: '#2573c1', dark: '#699ed3' },
+    { light: '#2530c1', dark: '#6970d3' },
+    { light: '#5c25c1', dark: '#8f69d3' },
+    { light: '#9f25c1', dark: '#bd69d3' },
+    { light: '#c1259f', dark: '#d369bd' },
+    { light: '#c1255c', dark: '#d3698f' },
+    { light: '#c13025', dark: '#d37069' },
+    { light: '#c17325', dark: '#d39e69' },
+    { light: '#c1b625', dark: '#d3cc69' },
+    { light: '#89c125', dark: '#add369' },
+    { light: '#46c125', dark: '#80d369' },
+    { light: '#25c146', dark: '#69d380' },
+    { light: '#25c189', dark: '#69d3ad' },
+    { light: '#25b6c1', dark: '#69ccd3' },
+  ];
+
+  const newBranchInput = document.getElementById('newBranchInput');
+  const addBranchBtn = document.getElementById('addBranchBtn');
+  const mindmapCanvas = document.getElementById('mindmapCanvas');
+  const connectorLayer = document.getElementById('connectorLayer');
+  const hubNode = document.getElementById('hubNode');
+  const branchRow = document.getElementById('branchRow');
+
+  function loadTodos() {
+    try { return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY)) || []; } catch { return []; }
+  }
+  function saveTodos(todos) {
+    localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+  }
+  function loadEntries() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+  }
+  function saveEntries(entries) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+  function loadDailyTemplates() {
+    try { return JSON.parse(localStorage.getItem(DAILY_STORAGE_KEY)) || []; } catch { return []; }
+  }
+  function saveDailyTemplates(templates) {
+    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(templates));
+  }
+  function loadCalendarEvents() {
+    try { return JSON.parse(localStorage.getItem(CALENDAR_STORAGE_KEY)) || []; } catch { return []; }
+  }
+  function saveCalendarEvents(events) {
+    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(events));
+  }
+  function loadCategories() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
+      if (Array.isArray(stored)) return stored;
+    } catch {}
+    saveCategories(DEFAULT_CATEGORIES);
+    return [...DEFAULT_CATEGORIES];
+  }
+  function saveCategories(categories) {
+    localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+  }
+  function loadCategoryColorMap() {
+    try { return JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {}; } catch { return {}; }
+  }
+  function saveCategoryColorMap(map) {
+    localStorage.setItem(CATEGORY_COLOR_MAP_KEY, JSON.stringify(map));
+  }
+
+  function hashCategoryName(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+    return hash % CATEGORY_COLOR_SLOTS.length;
+  }
+  function getCategorySlotIndex(name) {
+    const overrides = loadCategoryColorMap();
+    if (Number.isInteger(overrides[name]) && CATEGORY_COLOR_SLOTS[overrides[name]]) return overrides[name];
+    return hashCategoryName(name);
+  }
+  function isDarkMode() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    if (theme === 'dark') return true;
+    if (theme === 'light') return false;
+    return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+  function pickTextColor(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    return L > 0.45 ? '#1f2328' : '#ffffff';
+  }
+  function getCategoryColor(name) {
+    if (!name) return null;
+    const slot = CATEGORY_COLOR_SLOTS[getCategorySlotIndex(name)];
+    const bg = isDarkMode() ? slot.dark : slot.light;
+    return { bg, text: pickTextColor(bg) };
+  }
+
+  // 삭제 버튼: 한 번 더 누르면 실제 삭제(네이티브 confirm은 미리보기 환경에서
+  // 차단될 수 있어 쓰지 않음 - work-log 프로젝트의 기존 패턴 재사용)
+  function bindDeleteConfirm(btn, onConfirm) {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (btn.dataset.confirming === '1') {
+        onConfirm();
+        return;
+      }
+      btn.dataset.confirming = '1';
+      const original = btn.textContent;
+      btn.textContent = '?';
+      btn.title = '한 번 더 클릭하면 삭제';
+      btn.classList.add('confirming');
+      setTimeout(() => {
+        btn.dataset.confirming = '0';
+        btn.textContent = original;
+        btn.title = '';
+        btn.classList.remove('confirming');
+      }, 2500);
+    });
+  }
+
+  function addBranch() {
+    const name = newBranchInput.value.trim();
+    if (!name) {
+      newBranchInput.focus();
+      return;
+    }
+    const categories = loadCategories();
+    if (!categories.includes(name)) {
+      categories.push(name);
+      saveCategories(categories);
+    }
+    newBranchInput.value = '';
+    render();
+  }
+
+  function renameBranch(oldName, newName) {
+    if (!newName || oldName === newName) {
+      render();
+      return;
+    }
+    const categories = loadCategories();
+    if (categories.includes(newName)) {
+      render();
+      return;
+    }
+    saveCategories(categories.map((c) => (c === oldName ? newName : c)));
+
+    const colorMap = loadCategoryColorMap();
+    if (Object.prototype.hasOwnProperty.call(colorMap, oldName)) {
+      colorMap[newName] = colorMap[oldName];
+      delete colorMap[oldName];
+      saveCategoryColorMap(colorMap);
+    }
+
+    const remap = (c) => (c === oldName ? newName : c);
+    saveTodos(loadTodos().map((t) => (t.category ? { ...t, category: remap(t.category) } : t)));
+    saveEntries(loadEntries().map((e) => (e.category ? { ...e, category: remap(e.category) } : e)));
+    saveDailyTemplates(loadDailyTemplates().map((t) => (t.category ? { ...t, category: remap(t.category) } : t)));
+    saveCalendarEvents(loadCalendarEvents().map((e) => (e.category ? { ...e, category: remap(e.category) } : e)));
+    render();
+  }
+
+  function deleteBranch(name) {
+    saveCategories(loadCategories().filter((c) => c !== name));
+    const colorMap = loadCategoryColorMap();
+    if (Object.prototype.hasOwnProperty.call(colorMap, name)) {
+      delete colorMap[name];
+      saveCategoryColorMap(colorMap);
+    }
+    render();
+  }
+
+  function updateTodoCategory(id, category) {
+    saveTodos(loadTodos().map((t) => (t.id === id ? { ...t, category } : t)));
+    render();
+  }
+
+  function deleteTodoLeaf(id) {
+    saveTodos(loadTodos().filter((t) => t.id !== id));
+    render();
+  }
+
+  function startRenameBranch(titleSpan, name) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'branch-rename-input';
+    input.value = name;
+    titleSpan.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    function commit() {
+      if (done) return;
+      done = true;
+      renameBranch(name, input.value.trim());
+    }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commit();
+      if (e.key === 'Escape') {
+        done = true;
+        render();
+      }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  function drawConnectors() {
+    const canvasRect = mindmapCanvas.getBoundingClientRect();
+    connectorLayer.setAttribute('width', String(canvasRect.width));
+    connectorLayer.setAttribute('height', String(canvasRect.height));
+    connectorLayer.innerHTML = '';
+
+    const hubRect = hubNode.getBoundingClientRect();
+    const hubX = hubRect.left + hubRect.width / 2 - canvasRect.left;
+    const hubY = hubRect.top + hubRect.height / 2 - canvasRect.top;
+
+    branchRow.querySelectorAll('.branch').forEach((branchEl) => {
+      const r = branchEl.getBoundingClientRect();
+      const bx = r.left + r.width / 2 - canvasRect.left;
+      const by = r.top - canvasRect.top;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('class', 'connector-line');
+      line.setAttribute('x1', String(hubX));
+      line.setAttribute('y1', String(hubY));
+      line.setAttribute('x2', String(bx));
+      line.setAttribute('y2', String(by));
+      connectorLayer.appendChild(line);
+    });
+  }
+
+  function render() {
+    const categories = loadCategories();
+    const todos = loadTodos();
+
+    const grouped = {};
+    categories.forEach((c) => { grouped[c] = []; });
+    grouped[UNASSIGNED_KEY] = [];
+    todos.forEach((t) => {
+      const key = t.category && Object.prototype.hasOwnProperty.call(grouped, t.category) ? t.category : UNASSIGNED_KEY;
+      grouped[key].push(t);
+    });
+
+    const branchNames = [...categories, UNASSIGNED_KEY];
+    branchRow.innerHTML = '';
+
+    branchNames.forEach((name) => {
+      const isUnassigned = name === UNASSIGNED_KEY;
+      const label = isUnassigned ? '미분류' : name;
+      const color = isUnassigned ? null : getCategoryColor(name);
+
+      const branchEl = document.createElement('div');
+      branchEl.className = 'branch';
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'branch-header';
+      if (color) {
+        headerEl.style.background = color.bg;
+        headerEl.style.color = color.text;
+      }
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'branch-title';
+      titleSpan.textContent = label;
+      headerEl.appendChild(titleSpan);
+
+      if (!isUnassigned) {
+        const actions = document.createElement('span');
+        actions.className = 'branch-actions';
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.textContent = '✎';
+        renameBtn.addEventListener('click', () => startRenameBranch(titleSpan, name));
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = '×';
+        bindDeleteConfirm(delBtn, () => deleteBranch(name));
+        actions.appendChild(renameBtn);
+        actions.appendChild(delBtn);
+        headerEl.appendChild(actions);
+      }
+      branchEl.appendChild(headerEl);
+
+      const leavesEl = document.createElement('div');
+      leavesEl.className = 'branch-leaves';
+
+      const items = grouped[name] || [];
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'branch-empty';
+        empty.textContent = '항목 없음';
+        leavesEl.appendChild(empty);
+      }
+      items.forEach((t) => {
+        const leaf = document.createElement('div');
+        leaf.className = 'leaf';
+        leaf.draggable = true;
+
+        const textEl = document.createElement('span');
+        textEl.className = 'leaf-text';
+        textEl.textContent = t.text;
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'leaf-del-btn';
+        delBtn.textContent = '×';
+        bindDeleteConfirm(delBtn, () => deleteTodoLeaf(t.id));
+
+        leaf.appendChild(textEl);
+        leaf.appendChild(delBtn);
+
+        leaf.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', t.id);
+          leaf.classList.add('dragging');
+        });
+        leaf.addEventListener('dragend', () => leaf.classList.remove('dragging'));
+
+        leavesEl.appendChild(leaf);
+      });
+
+      leavesEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        leavesEl.classList.add('drag-over');
+      });
+      leavesEl.addEventListener('dragleave', () => leavesEl.classList.remove('drag-over'));
+      leavesEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        leavesEl.classList.remove('drag-over');
+        const id = e.dataTransfer.getData('text/plain');
+        if (id) updateTodoCategory(id, isUnassigned ? null : name);
+      });
+
+      branchEl.appendChild(leavesEl);
+      branchRow.appendChild(branchEl);
+    });
+
+    drawConnectors();
+  }
+
+  addBranchBtn.addEventListener('click', addBranch);
+  newBranchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addBranch();
+  });
+  window.addEventListener('resize', drawConnectors);
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
