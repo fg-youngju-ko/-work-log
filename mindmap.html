@@ -122,7 +122,7 @@
     gap: 20px;
   }
   .branch {
-    width: 220px;
+    width: 230px;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -161,7 +161,7 @@
     border-bottom: 1px solid currentColor;
     background: transparent;
     color: inherit;
-    width: 110px;
+    width: 120px;
   }
   .branch-leaves {
     min-height: 56px;
@@ -174,10 +174,9 @@
   .branch-leaves.drag-over { background: var(--accent-wash); }
   .leaf {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    padding: 6px 10px;
+    flex-direction: column;
+    gap: 5px;
+    padding: 7px 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--bg);
@@ -185,6 +184,7 @@
     cursor: grab;
   }
   .leaf.dragging { opacity: 0.35; }
+  .leaf-main { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
   .leaf-text { word-break: break-word; }
   .leaf-del-btn {
     background: transparent;
@@ -194,6 +194,16 @@
     padding: 0 4px;
     flex-shrink: 0;
     cursor: pointer;
+  }
+  .category-tag {
+    align-self: flex-start;
+    background: var(--border);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    border: 1px solid transparent;
   }
   .branch-empty {
     text-align: center;
@@ -217,7 +227,7 @@
   </header>
 
   <div class="add-branch-row">
-    <input type="text" id="newBranchInput" placeholder="새 대제목(카테고리) 이름">
+    <input type="text" id="newBranchInput" placeholder="새 업무대제목 이름 (예: 신제품 A 출시)">
     <button type="button" id="addBranchBtn">추가</button>
   </div>
 
@@ -227,21 +237,21 @@
     <div class="branch-row" id="branchRow"></div>
   </div>
 
-  <p class="hint">할 일을 드래그해서 다른 대제목으로 옮길 수 있습니다. 대제목의 ✎(수정)/×(삭제)는 헤더 우측에 있습니다.</p>
+  <p class="hint">
+    할 일을 드래그해서 다른 업무대제목으로 옮길 수 있습니다. 업무대제목은 기존 카테고리와 별개의 분류이며,
+    카테고리는 항목 아래에 참고용 태그로만 표시됩니다(여기서는 수정 불가). 대제목의 ✎(수정)/×(삭제)는 헤더 우측에 있습니다.
+  </p>
 </div>
 
 <script>
 (function () {
   const TODO_STORAGE_KEY = 'workLog.todos';
-  const STORAGE_KEY = 'workLog.entries';
-  const CATEGORY_STORAGE_KEY = 'workLog.categories';
+  const PROJECT_STORAGE_KEY = 'workLog.projects';
+  const PROJECT_COLOR_MAP_KEY = 'workLog.projectColors';
   const CATEGORY_COLOR_MAP_KEY = 'workLog.categoryColors';
-  const DAILY_STORAGE_KEY = 'workLog.dailyTemplates';
-  const CALENDAR_STORAGE_KEY = 'workLog.calendarEvents';
-  const DEFAULT_CATEGORIES = ['회의', '개발', '문서·보고', '고객대응', '기타'];
   const UNASSIGNED_KEY = '__unassigned__';
 
-  const CATEGORY_COLOR_SLOTS = [
+  const COLOR_SLOTS = [
     { light: '#2573c1', dark: '#699ed3' },
     { light: '#2530c1', dark: '#6970d3' },
     { light: '#5c25c1', dark: '#8f69d3' },
@@ -271,51 +281,26 @@
   function saveTodos(todos) {
     localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
   }
-  function loadEntries() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+  function loadProjects() {
+    try { return JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY)) || []; } catch { return []; }
   }
-  function saveEntries(entries) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  function saveProjects(projects) {
+    localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
   }
-  function loadDailyTemplates() {
-    try { return JSON.parse(localStorage.getItem(DAILY_STORAGE_KEY)) || []; } catch { return []; }
+  function loadProjectColorMap() {
+    try { return JSON.parse(localStorage.getItem(PROJECT_COLOR_MAP_KEY)) || {}; } catch { return {}; }
   }
-  function saveDailyTemplates(templates) {
-    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(templates));
-  }
-  function loadCalendarEvents() {
-    try { return JSON.parse(localStorage.getItem(CALENDAR_STORAGE_KEY)) || []; } catch { return []; }
-  }
-  function saveCalendarEvents(events) {
-    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(events));
-  }
-  function loadCategories() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
-      if (Array.isArray(stored)) return stored;
-    } catch {}
-    saveCategories(DEFAULT_CATEGORIES);
-    return [...DEFAULT_CATEGORIES];
-  }
-  function saveCategories(categories) {
-    localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+  function saveProjectColorMap(map) {
+    localStorage.setItem(PROJECT_COLOR_MAP_KEY, JSON.stringify(map));
   }
   function loadCategoryColorMap() {
     try { return JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {}; } catch { return {}; }
   }
-  function saveCategoryColorMap(map) {
-    localStorage.setItem(CATEGORY_COLOR_MAP_KEY, JSON.stringify(map));
-  }
 
-  function hashCategoryName(name) {
+  function hashName(name) {
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-    return hash % CATEGORY_COLOR_SLOTS.length;
-  }
-  function getCategorySlotIndex(name) {
-    const overrides = loadCategoryColorMap();
-    if (Number.isInteger(overrides[name]) && CATEGORY_COLOR_SLOTS[overrides[name]]) return overrides[name];
-    return hashCategoryName(name);
+    return hash % COLOR_SLOTS.length;
   }
   function isDarkMode() {
     const theme = document.documentElement.getAttribute('data-theme');
@@ -331,11 +316,20 @@
     const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
     return L > 0.45 ? '#1f2328' : '#ffffff';
   }
-  function getCategoryColor(name) {
+  // 업무대제목(프로젝트)과 기존 카테고리는 서로 다른 이름공간이라 각자의
+  // override 맵을 받아 같은 팔레트에서 독립적으로 색을 고른다.
+  function getColorFor(name, overrideMap) {
     if (!name) return null;
-    const slot = CATEGORY_COLOR_SLOTS[getCategorySlotIndex(name)];
+    const idx = Number.isInteger(overrideMap[name]) && COLOR_SLOTS[overrideMap[name]] ? overrideMap[name] : hashName(name);
+    const slot = COLOR_SLOTS[idx];
     const bg = isDarkMode() ? slot.dark : slot.light;
     return { bg, text: pickTextColor(bg) };
+  }
+  function getProjectColor(name) {
+    return getColorFor(name, loadProjectColorMap());
+  }
+  function getCategoryTagColor(name) {
+    return getColorFor(name, loadCategoryColorMap());
   }
 
   // 삭제 버튼: 한 번 더 누르면 실제 삭제(네이티브 confirm은 미리보기 환경에서
@@ -361,60 +355,56 @@
     });
   }
 
-  function addBranch() {
+  function addProject() {
     const name = newBranchInput.value.trim();
     if (!name) {
       newBranchInput.focus();
       return;
     }
-    const categories = loadCategories();
-    if (!categories.includes(name)) {
-      categories.push(name);
-      saveCategories(categories);
+    const projects = loadProjects();
+    if (!projects.includes(name)) {
+      projects.push(name);
+      saveProjects(projects);
     }
     newBranchInput.value = '';
     render();
   }
 
-  function renameBranch(oldName, newName) {
+  function renameProject(oldName, newName) {
     if (!newName || oldName === newName) {
       render();
       return;
     }
-    const categories = loadCategories();
-    if (categories.includes(newName)) {
+    const projects = loadProjects();
+    if (projects.includes(newName)) {
       render();
       return;
     }
-    saveCategories(categories.map((c) => (c === oldName ? newName : c)));
+    saveProjects(projects.map((p) => (p === oldName ? newName : p)));
 
-    const colorMap = loadCategoryColorMap();
+    const colorMap = loadProjectColorMap();
     if (Object.prototype.hasOwnProperty.call(colorMap, oldName)) {
       colorMap[newName] = colorMap[oldName];
       delete colorMap[oldName];
-      saveCategoryColorMap(colorMap);
+      saveProjectColorMap(colorMap);
     }
 
-    const remap = (c) => (c === oldName ? newName : c);
-    saveTodos(loadTodos().map((t) => (t.category ? { ...t, category: remap(t.category) } : t)));
-    saveEntries(loadEntries().map((e) => (e.category ? { ...e, category: remap(e.category) } : e)));
-    saveDailyTemplates(loadDailyTemplates().map((t) => (t.category ? { ...t, category: remap(t.category) } : t)));
-    saveCalendarEvents(loadCalendarEvents().map((e) => (e.category ? { ...e, category: remap(e.category) } : e)));
+    saveTodos(loadTodos().map((t) => (t.project === oldName ? { ...t, project: newName } : t)));
     render();
   }
 
-  function deleteBranch(name) {
-    saveCategories(loadCategories().filter((c) => c !== name));
-    const colorMap = loadCategoryColorMap();
+  function deleteProject(name) {
+    saveProjects(loadProjects().filter((p) => p !== name));
+    const colorMap = loadProjectColorMap();
     if (Object.prototype.hasOwnProperty.call(colorMap, name)) {
       delete colorMap[name];
-      saveCategoryColorMap(colorMap);
+      saveProjectColorMap(colorMap);
     }
     render();
   }
 
-  function updateTodoCategory(id, category) {
-    saveTodos(loadTodos().map((t) => (t.id === id ? { ...t, category } : t)));
+  function updateTodoProject(id, project) {
+    saveTodos(loadTodos().map((t) => (t.id === id ? { ...t, project } : t)));
     render();
   }
 
@@ -423,7 +413,7 @@
     render();
   }
 
-  function startRenameBranch(titleSpan, name) {
+  function startRenameProject(titleSpan, name) {
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'branch-rename-input';
@@ -436,7 +426,7 @@
     function commit() {
       if (done) return;
       done = true;
-      renameBranch(name, input.value.trim());
+      renameProject(name, input.value.trim());
     }
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') commit();
@@ -472,25 +462,28 @@
     });
   }
 
+  // 마인드맵의 가지(대제목) = 업무대제목(workLog.projects), 기존 카테고리와는 별개.
+  // 각 항목(leaf)은 자신이 속한 대제목 아래에 나타나되, 원래 카테고리는 참고용
+  // 태그로만 함께 표시한다(여기서는 카테고리 자체를 수정하지 않음).
   function render() {
-    const categories = loadCategories();
+    const projects = loadProjects();
     const todos = loadTodos();
 
     const grouped = {};
-    categories.forEach((c) => { grouped[c] = []; });
+    projects.forEach((p) => { grouped[p] = []; });
     grouped[UNASSIGNED_KEY] = [];
     todos.forEach((t) => {
-      const key = t.category && Object.prototype.hasOwnProperty.call(grouped, t.category) ? t.category : UNASSIGNED_KEY;
+      const key = t.project && Object.prototype.hasOwnProperty.call(grouped, t.project) ? t.project : UNASSIGNED_KEY;
       grouped[key].push(t);
     });
 
-    const branchNames = [...categories, UNASSIGNED_KEY];
+    const branchNames = [...projects, UNASSIGNED_KEY];
     branchRow.innerHTML = '';
 
     branchNames.forEach((name) => {
       const isUnassigned = name === UNASSIGNED_KEY;
-      const label = isUnassigned ? '미분류' : name;
-      const color = isUnassigned ? null : getCategoryColor(name);
+      const label = isUnassigned ? '미배정' : name;
+      const color = isUnassigned ? null : getProjectColor(name);
 
       const branchEl = document.createElement('div');
       branchEl.className = 'branch';
@@ -513,11 +506,11 @@
         const renameBtn = document.createElement('button');
         renameBtn.type = 'button';
         renameBtn.textContent = '✎';
-        renameBtn.addEventListener('click', () => startRenameBranch(titleSpan, name));
+        renameBtn.addEventListener('click', () => startRenameProject(titleSpan, name));
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.textContent = '×';
-        bindDeleteConfirm(delBtn, () => deleteBranch(name));
+        bindDeleteConfirm(delBtn, () => deleteProject(name));
         actions.appendChild(renameBtn);
         actions.appendChild(delBtn);
         headerEl.appendChild(actions);
@@ -539,6 +532,8 @@
         leaf.className = 'leaf';
         leaf.draggable = true;
 
+        const mainRow = document.createElement('div');
+        mainRow.className = 'leaf-main';
         const textEl = document.createElement('span');
         textEl.className = 'leaf-text';
         textEl.textContent = t.text;
@@ -547,9 +542,20 @@
         delBtn.className = 'leaf-del-btn';
         delBtn.textContent = '×';
         bindDeleteConfirm(delBtn, () => deleteTodoLeaf(t.id));
+        mainRow.appendChild(textEl);
+        mainRow.appendChild(delBtn);
+        leaf.appendChild(mainRow);
 
-        leaf.appendChild(textEl);
-        leaf.appendChild(delBtn);
+        const tagEl = document.createElement('span');
+        tagEl.className = 'category-tag';
+        tagEl.textContent = t.category || '미분류';
+        const catColor = getCategoryTagColor(t.category);
+        if (catColor) {
+          tagEl.style.background = catColor.bg;
+          tagEl.style.color = catColor.text;
+          tagEl.style.borderColor = catColor.bg;
+        }
+        leaf.appendChild(tagEl);
 
         leaf.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', t.id);
@@ -569,7 +575,7 @@
         e.preventDefault();
         leavesEl.classList.remove('drag-over');
         const id = e.dataTransfer.getData('text/plain');
-        if (id) updateTodoCategory(id, isUnassigned ? null : name);
+        if (id) updateTodoProject(id, isUnassigned ? null : name);
       });
 
       branchEl.appendChild(leavesEl);
@@ -579,9 +585,9 @@
     drawConnectors();
   }
 
-  addBranchBtn.addEventListener('click', addBranch);
+  addBranchBtn.addEventListener('click', addProject);
   newBranchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') addBranch();
+    if (e.key === 'Enter') addProject();
   });
   window.addEventListener('resize', drawConnectors);
   if (window.matchMedia) {
