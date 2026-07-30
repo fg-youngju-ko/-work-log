@@ -185,7 +185,29 @@
   }
   .leaf.dragging { opacity: 0.35; }
   .leaf-main { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-  .leaf-text { word-break: break-word; }
+  .leaf-text { position: relative; word-break: break-word; }
+  .leaf-text.has-memo { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
+  .leaf-text .memo-popup {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 8px 10px;
+    width: max-content;
+    max-width: 220px;
+    white-space: pre-wrap;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text);
+    z-index: 30;
+    cursor: default;
+  }
+  .leaf-text.has-memo:hover .memo-popup { display: block; }
   .leaf-del-btn {
     background: transparent;
     border: none;
@@ -536,7 +558,14 @@
         mainRow.className = 'leaf-main';
         const textEl = document.createElement('span');
         textEl.className = 'leaf-text';
-        textEl.textContent = t.text;
+        textEl.appendChild(document.createTextNode(t.text));
+        if (t.memo) {
+          textEl.classList.add('has-memo');
+          const memoPopup = document.createElement('span');
+          memoPopup.className = 'memo-popup';
+          memoPopup.textContent = t.memo;
+          textEl.appendChild(memoPopup);
+        }
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'leaf-del-btn';
