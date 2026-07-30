@@ -78,6 +78,15 @@
     background: var(--card-bg);
     color: var(--text);
   }
+  .add-branch-row select {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
   .add-branch-row button {
     background: var(--accent);
     color: var(--accent-text);
@@ -254,6 +263,7 @@
 
   <div class="add-branch-row">
     <input type="text" id="newTodoInput" placeholder="새 할 일 추가">
+    <select id="newTodoCategoryInput"></select>
     <button type="button" id="addTodoBtn">추가</button>
   </div>
 
@@ -285,6 +295,7 @@
   const CALENDAR_STORAGE_KEY = 'workLog.calendarEvents';
   const PROJECT_STORAGE_KEY = 'workLog.projects';
   const PROJECT_COLOR_MAP_KEY = 'workLog.projectColors';
+  const CATEGORY_STORAGE_KEY = 'workLog.categories';
   const CATEGORY_COLOR_MAP_KEY = 'workLog.categoryColors';
   const UNASSIGNED_KEY = '__unassigned__';
   const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -307,6 +318,7 @@
   ];
 
   const newTodoInput = document.getElementById('newTodoInput');
+  const newTodoCategoryInput = document.getElementById('newTodoCategoryInput');
   const addTodoBtn = document.getElementById('addTodoBtn');
   const newBranchInput = document.getElementById('newBranchInput');
   const addBranchBtn = document.getElementById('addBranchBtn');
@@ -428,12 +440,13 @@
       id: crypto.randomUUID(),
       text,
       memo: '',
-      category: null,
+      category: newTodoCategoryInput.value || null,
       project: null,
       createdAt: new Date().toISOString(),
     });
     saveTodos(todos);
     newTodoInput.value = '';
+    newTodoCategoryInput.value = '';
     newTodoInput.focus();
     render();
   }
@@ -451,6 +464,29 @@
   }
   function loadCategoryColorMap() {
     try { return JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {}; } catch { return {}; }
+  }
+  // 카테고리 자체의 추가/수정/삭제는 index.html에서만 관리 - 여기서는 새 할 일
+  // 작성 시 고를 수 있도록 목록만 읽어온다(없으면 빈 배열, 기본값을 만들어 쓰지 않음).
+  function loadCategories() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
+      if (Array.isArray(stored)) return stored;
+    } catch {}
+    return [];
+  }
+  function populateNewTodoCategorySelect() {
+    const categories = loadCategories();
+    newTodoCategoryInput.innerHTML = '';
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = '미분류';
+    newTodoCategoryInput.appendChild(noneOpt);
+    categories.forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      newTodoCategoryInput.appendChild(opt);
+    });
   }
 
   function hashName(name) {
@@ -629,7 +665,7 @@
 
     branchNames.forEach((name) => {
       const isUnassigned = name === UNASSIGNED_KEY;
-      const label = isUnassigned ? '미배정' : name;
+      const label = isUnassigned ? '자동 생성' : name;
       const color = isUnassigned ? null : getProjectColor(name);
 
       const branchEl = document.createElement('div');
@@ -762,6 +798,7 @@
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   }
 
+  populateNewTodoCategorySelect();
   render();
 })();
 </script>
