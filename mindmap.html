@@ -221,6 +221,16 @@
     font-weight: 600;
     border: 1px solid transparent;
   }
+  .leaf-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .source-badge {
+    align-self: flex-start;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-dark);
+    background: var(--accent-wash);
+    border-radius: 999px;
+    padding: 1px 7px;
+  }
   .branch-empty {
     text-align: center;
     color: var(--text-muted);
@@ -243,6 +253,11 @@
   </header>
 
   <div class="add-branch-row">
+    <input type="text" id="newTodoInput" placeholder="새 할 일 추가">
+    <button type="button" id="addTodoBtn">추가</button>
+  </div>
+
+  <div class="add-branch-row">
     <input type="text" id="newBranchInput" placeholder="새 업무대제목 이름 (예: 신제품 A 출시)">
     <button type="button" id="addBranchBtn">추가</button>
   </div>
@@ -254,8 +269,10 @@
   </div>
 
   <p class="hint">
-    할 일을 드래그해서 다른 업무대제목으로 옮길 수 있습니다. 업무대제목은 기존 카테고리와 별개의 분류이며,
-    카테고리는 항목 아래에 참고용 태그로만 표시됩니다(여기서는 수정 불가). 대제목의 ✎(수정)/×(삭제)는 헤더 우측에 있습니다.
+    일반 TODO뿐 아니라 오늘 활성화된 Daily 업무("매일"/"매주 X" 배지)와 오늘 날짜의 달력 일정("📅 오늘" 배지)도
+    함께 표시됩니다. 할 일을 드래그해서 다른 업무대제목으로 옮길 수 있습니다. 업무대제목은 기존 카테고리와
+    별개의 분류이며, 카테고리는 항목 아래에 참고용 태그로만 표시됩니다(여기서는 수정 불가).
+    대제목의 ✎(수정)/×(삭제)는 헤더 우측에 있습니다.
   </p>
 </div>
 <div id="floatingMemoPopup"></div>
@@ -263,10 +280,14 @@
 <script>
 (function () {
   const TODO_STORAGE_KEY = 'workLog.todos';
+  const DAILY_STORAGE_KEY = 'workLog.dailyTemplates';
+  const DAILY_COMPLETIONS_KEY = 'workLog.dailyCompletions';
+  const CALENDAR_STORAGE_KEY = 'workLog.calendarEvents';
   const PROJECT_STORAGE_KEY = 'workLog.projects';
   const PROJECT_COLOR_MAP_KEY = 'workLog.projectColors';
   const CATEGORY_COLOR_MAP_KEY = 'workLog.categoryColors';
   const UNASSIGNED_KEY = '__unassigned__';
+  const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
   const COLOR_SLOTS = [
     { light: '#2573c1', dark: '#699ed3' },
@@ -285,6 +306,8 @@
     { light: '#25b6c1', dark: '#69ccd3' },
   ];
 
+  const newTodoInput = document.getElementById('newTodoInput');
+  const addTodoBtn = document.getElementById('addTodoBtn');
   const newBranchInput = document.getElementById('newBranchInput');
   const addBranchBtn = document.getElementById('addBranchBtn');
   const mindmapCanvas = document.getElementById('mindmapCanvas');
@@ -317,6 +340,102 @@
   }
   function saveTodos(todos) {
     localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+  }
+  function loadDailyTemplates() {
+    try { return JSON.parse(localStorage.getItem(DAILY_STORAGE_KEY)) || []; } catch { return []; }
+  }
+  function saveDailyTemplates(templates) {
+    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(templates));
+  }
+  function loadDailyCompletions() {
+    try { return JSON.parse(localStorage.getItem(DAILY_COMPLETIONS_KEY)) || []; } catch { return []; }
+  }
+  function saveDailyCompletions(completions) {
+    localStorage.setItem(DAILY_COMPLETIONS_KEY, JSON.stringify(completions));
+  }
+  function loadCalendarEvents() {
+    try { return JSON.parse(localStorage.getItem(CALENDAR_STORAGE_KEY)) || []; } catch { return []; }
+  }
+  function saveCalendarEvents(events) {
+    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(events));
+  }
+
+  function getTodayStr() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  // index.html의 TODO/Daily/달력을 전부 모아 하나의 마인드맵으로 보여준다.
+  // 각 항목은 __source로 원래 저장소를 기억해서, 프로젝트 재배치·삭제 시
+  // 올바른 저장소에 반영되도록 한다.
+  function getRegularTodoItems() {
+    return loadTodos().map((t) => ({ ...t, __source: 'todo', __key: `todo:${t.id}` }));
+  }
+  function getActiveDailyItems() {
+    const todayStr = getTodayStr();
+    const todayWeekday = new Date().getDay();
+    const completedTodayIds = new Set(
+      loadDailyCompletions().filter((c) => c.date === todayStr).map((c) => c.templateId)
+    );
+    return loadDailyTemplates()
+      .filter((t) => (t.frequency === 'daily' || t.weekday === todayWeekday) && !completedTodayIds.has(t.id))
+      .map((t) => ({
+        ...t,
+        __source: 'daily',
+        __key: `daily:${t.id}`,
+        __badge: t.frequency === 'weekly' ? `매주 ${WEEKDAY_LABELS[t.weekday]}` : '매일',
+      }));
+  }
+  function getTodayCalendarItems() {
+    const todayStr = getTodayStr();
+    return loadCalendarEvents()
+      .filter((e) => e.date === todayStr)
+      .map((e) => ({ ...e, __source: 'calendar', __key: `cal:${e.id}`, __badge: '📅 오늘' }));
+  }
+
+  function updateItemProject(item, project) {
+    if (item.__source === 'daily') {
+      saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === item.id ? { ...t, project } : t)));
+    } else if (item.__source === 'calendar') {
+      saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === item.id ? { ...e, project } : e)));
+    } else {
+      saveTodos(loadTodos().map((t) => (t.id === item.id ? { ...t, project } : t)));
+    }
+    render();
+  }
+
+  function deleteItem(item) {
+    if (item.__source === 'daily') {
+      saveDailyTemplates(loadDailyTemplates().filter((t) => t.id !== item.id));
+      saveDailyCompletions(loadDailyCompletions().filter((c) => c.templateId !== item.id));
+    } else if (item.__source === 'calendar') {
+      saveCalendarEvents(loadCalendarEvents().filter((e) => e.id !== item.id));
+    } else {
+      saveTodos(loadTodos().filter((t) => t.id !== item.id));
+    }
+    render();
+  }
+
+  function addTodo() {
+    const text = newTodoInput.value.trim();
+    if (!text) {
+      newTodoInput.focus();
+      return;
+    }
+    const todos = loadTodos();
+    todos.push({
+      id: crypto.randomUUID(),
+      text,
+      memo: '',
+      category: null,
+      project: null,
+      createdAt: new Date().toISOString(),
+    });
+    saveTodos(todos);
+    newTodoInput.value = '';
+    newTodoInput.focus();
+    render();
   }
   function loadProjects() {
     try { return JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY)) || []; } catch { return []; }
@@ -440,15 +559,6 @@
     render();
   }
 
-  function updateTodoProject(id, project) {
-    saveTodos(loadTodos().map((t) => (t.id === id ? { ...t, project } : t)));
-    render();
-  }
-
-  function deleteTodoLeaf(id) {
-    saveTodos(loadTodos().filter((t) => t.id !== id));
-    render();
-  }
 
   function startRenameProject(titleSpan, name) {
     const input = document.createElement('input');
@@ -504,14 +614,14 @@
   // 태그로만 함께 표시한다(여기서는 카테고리 자체를 수정하지 않음).
   function render() {
     const projects = loadProjects();
-    const todos = loadTodos();
+    const allItems = [...getRegularTodoItems(), ...getActiveDailyItems(), ...getTodayCalendarItems()];
 
     const grouped = {};
     projects.forEach((p) => { grouped[p] = []; });
     grouped[UNASSIGNED_KEY] = [];
-    todos.forEach((t) => {
-      const key = t.project && Object.prototype.hasOwnProperty.call(grouped, t.project) ? t.project : UNASSIGNED_KEY;
-      grouped[key].push(t);
+    allItems.forEach((item) => {
+      const key = item.project && Object.prototype.hasOwnProperty.call(grouped, item.project) ? item.project : UNASSIGNED_KEY;
+      grouped[key].push(item);
     });
 
     const branchNames = [...projects, UNASSIGNED_KEY];
@@ -564,7 +674,7 @@
         empty.textContent = '항목 없음';
         leavesEl.appendChild(empty);
       }
-      items.forEach((t) => {
+      items.forEach((item) => {
         const leaf = document.createElement('div');
         leaf.className = 'leaf';
         leaf.draggable = true;
@@ -573,34 +683,45 @@
         mainRow.className = 'leaf-main';
         const textEl = document.createElement('span');
         textEl.className = 'leaf-text';
-        textEl.textContent = t.text;
-        if (t.memo) {
+        textEl.textContent = item.text;
+        if (item.memo) {
           textEl.classList.add('has-memo');
-          textEl.addEventListener('mouseenter', () => showMemoPopup(textEl, t.memo));
+          textEl.addEventListener('mouseenter', () => showMemoPopup(textEl, item.memo));
           textEl.addEventListener('mouseleave', hideMemoPopup);
         }
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'leaf-del-btn';
         delBtn.textContent = '×';
-        bindDeleteConfirm(delBtn, () => deleteTodoLeaf(t.id));
+        bindDeleteConfirm(delBtn, () => deleteItem(item));
         mainRow.appendChild(textEl);
         mainRow.appendChild(delBtn);
         leaf.appendChild(mainRow);
 
+        const tagsRow = document.createElement('div');
+        tagsRow.className = 'leaf-tags';
+
+        if (item.__badge) {
+          const badgeEl = document.createElement('span');
+          badgeEl.className = 'source-badge';
+          badgeEl.textContent = item.__badge;
+          tagsRow.appendChild(badgeEl);
+        }
+
         const tagEl = document.createElement('span');
         tagEl.className = 'category-tag';
-        tagEl.textContent = t.category || '미분류';
-        const catColor = getCategoryTagColor(t.category);
+        tagEl.textContent = item.category || '미분류';
+        const catColor = getCategoryTagColor(item.category);
         if (catColor) {
           tagEl.style.background = catColor.bg;
           tagEl.style.color = catColor.text;
           tagEl.style.borderColor = catColor.bg;
         }
-        leaf.appendChild(tagEl);
+        tagsRow.appendChild(tagEl);
+        leaf.appendChild(tagsRow);
 
         leaf.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', t.id);
+          e.dataTransfer.setData('text/plain', item.__key);
           leaf.classList.add('dragging');
         });
         leaf.addEventListener('dragend', () => leaf.classList.remove('dragging'));
@@ -616,8 +737,9 @@
       leavesEl.addEventListener('drop', (e) => {
         e.preventDefault();
         leavesEl.classList.remove('drag-over');
-        const id = e.dataTransfer.getData('text/plain');
-        if (id) updateTodoProject(id, isUnassigned ? null : name);
+        const key = e.dataTransfer.getData('text/plain');
+        const item = allItems.find((it) => it.__key === key);
+        if (item) updateItemProject(item, isUnassigned ? null : name);
       });
 
       branchEl.appendChild(leavesEl);
@@ -627,6 +749,10 @@
     drawConnectors();
   }
 
+  addTodoBtn.addEventListener('click', addTodo);
+  newTodoInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addTodo();
+  });
   addBranchBtn.addEventListener('click', addProject);
   newBranchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addProject();
