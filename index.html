@@ -1047,6 +1047,14 @@
       <button type="button" id="calAddBtn">추가</button>
     </div>
   </section>
+
+  <section class="summary-card" id="dailySummarySection">
+    <div class="summary-header">
+      <h2>✅ 오늘 완료한 업무</h2>
+    </div>
+    <div class="summary-range" id="dailySummaryRange"></div>
+    <div id="dailySummaryBody"></div>
+  </section>
 </div>
 </div>
 
@@ -1085,6 +1093,8 @@
   const summaryTodayBtn = document.getElementById('summaryTodayBtn');
   const summaryDateInput = document.getElementById('summaryDateInput');
   let summaryViewDate = new Date();
+  const dailySummaryRange = document.getElementById('dailySummaryRange');
+  const dailySummaryBody = document.getElementById('dailySummaryBody');
 
   const searchInput = document.getElementById('searchInput');
   const searchCategoryInput = document.getElementById('searchCategoryInput');
@@ -1478,26 +1488,15 @@
     return { title: content.slice(0, idx), memo: content.slice(idx + 2) };
   }
 
-  function renderSummary() {
-    const { start, end } = getWeekRange(summaryViewDate);
-    summaryRange.textContent = `${formatDateShort(start)} ~ ${formatDateShort(end)}`;
-    summaryDateInput.value = toDatetimeLocalValue(summaryViewDate).slice(0, 10);
-
-    const entries = loadEntries().filter((e) => {
-      const t = new Date(e.start).getTime();
-      if (t < start.getTime() || t > end.getTime()) return false;
-      // 데일리 업무는 메모 없이 그냥 완료만 한 경우 요약에서 제외(반복 루틴이라 노이즈가 됨)
-      if (e.source === 'daily' && !splitEntryContent(e.content).memo) return false;
-      return true;
-    });
-
-    summaryBody.innerHTML = '';
+  // 이번주 요약/오늘 완료 업무 둘 다 "카테고리별로 묶어서 보여주기"가 동일해서 공용화.
+  function renderEntryGroups(container, entries, emptyText) {
+    container.innerHTML = '';
 
     if (!entries.length) {
       const empty = document.createElement('div');
       empty.className = 'summary-empty';
-      empty.textContent = '이번 주에 작성된 업무일지가 없습니다.';
-      summaryBody.appendChild(empty);
+      empty.textContent = emptyText;
+      container.appendChild(empty);
       return;
     }
 
@@ -1561,8 +1560,41 @@
           groupEl.appendChild(itemEl);
         });
 
-        summaryBody.appendChild(groupEl);
+        container.appendChild(groupEl);
       });
+  }
+
+  // 데일리 업무는 메모 없이 그냥 완료만 한 경우 요약에서 제외(반복 루틴이라 노이즈가 됨)
+  function isNoisyDailyEntry(e) {
+    return e.source === 'daily' && !splitEntryContent(e.content).memo;
+  }
+
+  function renderSummary() {
+    const { start, end } = getWeekRange(summaryViewDate);
+    summaryRange.textContent = `${formatDateShort(start)} ~ ${formatDateShort(end)}`;
+    summaryDateInput.value = toDatetimeLocalValue(summaryViewDate).slice(0, 10);
+
+    const entries = loadEntries().filter((e) => {
+      const t = new Date(e.start).getTime();
+      if (t < start.getTime() || t > end.getTime()) return false;
+      if (isNoisyDailyEntry(e)) return false;
+      return true;
+    });
+
+    renderEntryGroups(summaryBody, entries, '이번 주에 작성된 업무일지가 없습니다.');
+  }
+
+  function renderDailySummary() {
+    const todayStr = getTodayStr();
+    dailySummaryRange.textContent = formatDateShort(new Date());
+
+    const entries = loadEntries().filter((e) => {
+      if (e.start.slice(0, 10) !== todayStr) return false;
+      if (isNoisyDailyEntry(e)) return false;
+      return true;
+    });
+
+    renderEntryGroups(dailySummaryBody, entries, '오늘 완료한 업무가 없습니다.');
   }
 
   summaryPrevBtn.addEventListener('click', () => {
@@ -2437,6 +2469,7 @@
       ? (entries.length ? `검색결과 ${entries.length}건` : '검색결과 없음')
       : (allEntries.length ? `총 ${allEntries.length}건` : '');
     renderSummary();
+    renderDailySummary();
 
     if (!entries.length) {
       entryList.innerHTML = `<div class="empty-state">${isFiltering ? '검색 결과가 없습니다.' : '아직 작성된 업무일지가 없습니다.'}</div>`;
