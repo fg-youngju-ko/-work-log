@@ -213,6 +213,8 @@
     z-index: 1000;
     pointer-events: none;
   }
+  .leaf-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .leaf-edit-btn,
   .leaf-del-btn {
     background: transparent;
     border: none;
@@ -222,6 +224,43 @@
     flex-shrink: 0;
     cursor: pointer;
   }
+  .leaf-edit-form { margin-top: 6px; }
+  .leaf-edit-form input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-family: inherit;
+    font-size: 12.5px;
+    background: transparent;
+    color: var(--text);
+    margin-bottom: 5px;
+  }
+  .leaf-edit-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-family: inherit;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text);
+    resize: vertical;
+    margin-bottom: 5px;
+  }
+  .leaf-edit-actions { display: flex; justify-content: flex-end; gap: 5px; }
+  .leaf-edit-actions button {
+    padding: 3px 9px;
+    font-size: 11px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .leaf-edit-save-btn { background: var(--accent); color: var(--accent-text); }
+  .leaf-edit-cancel-btn { background: var(--border); color: var(--text); }
   .category-tag {
     align-self: flex-start;
     background: var(--border);
@@ -422,6 +461,17 @@
       saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === item.id ? { ...e, project } : e)));
     } else {
       saveTodos(loadTodos().map((t) => (t.id === item.id ? { ...t, project } : t)));
+    }
+    render();
+  }
+
+  function updateItemContent(item, text, memo) {
+    if (item.__source === 'daily') {
+      saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === item.id ? { ...t, text, memo } : t)));
+    } else if (item.__source === 'calendar') {
+      saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === item.id ? { ...e, text, memo } : e)));
+    } else {
+      saveTodos(loadTodos().map((t) => (t.id === item.id ? { ...t, text, memo } : t)));
     }
     render();
   }
@@ -777,14 +827,22 @@
         checkGroup.appendChild(checkbox);
         checkGroup.appendChild(textEl);
 
+        const actionsGroup = document.createElement('div');
+        actionsGroup.className = 'leaf-actions';
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'leaf-edit-btn';
+        editBtn.textContent = '✎';
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'leaf-del-btn';
         delBtn.textContent = '×';
         bindDeleteConfirm(delBtn, () => deleteItem(item));
+        actionsGroup.appendChild(editBtn);
+        actionsGroup.appendChild(delBtn);
 
         mainRow.appendChild(checkGroup);
-        mainRow.appendChild(delBtn);
+        mainRow.appendChild(actionsGroup);
         leaf.appendChild(mainRow);
 
         const tagsRow = document.createElement('div');
@@ -808,6 +866,47 @@
         }
         tagsRow.appendChild(tagEl);
         leaf.appendChild(tagsRow);
+
+        // 인라인 수정 폼: 본문/메모를 여기서 바로 고쳐 저장(카테고리는 참고 태그로만
+        // 유지 - 카테고리 자체 관리는 index.html 전담이라는 기존 방침 유지).
+        const editForm = document.createElement('div');
+        editForm.className = 'leaf-edit-form hidden';
+        const editTextInput = document.createElement('input');
+        editTextInput.type = 'text';
+        const editMemoTextarea = document.createElement('textarea');
+        editMemoTextarea.placeholder = '상세 메모';
+        const editActions = document.createElement('div');
+        editActions.className = 'leaf-edit-actions';
+        const editCancelBtn = document.createElement('button');
+        editCancelBtn.type = 'button';
+        editCancelBtn.className = 'leaf-edit-cancel-btn';
+        editCancelBtn.textContent = '취소';
+        const editSaveBtn = document.createElement('button');
+        editSaveBtn.type = 'button';
+        editSaveBtn.className = 'leaf-edit-save-btn';
+        editSaveBtn.textContent = '저장';
+        editActions.appendChild(editCancelBtn);
+        editActions.appendChild(editSaveBtn);
+        editForm.appendChild(editTextInput);
+        editForm.appendChild(editMemoTextarea);
+        editForm.appendChild(editActions);
+        leaf.appendChild(editForm);
+
+        editBtn.addEventListener('click', () => {
+          editTextInput.value = item.text;
+          editMemoTextarea.value = item.memo || '';
+          editForm.classList.toggle('hidden');
+          if (!editForm.classList.contains('hidden')) editTextInput.focus();
+        });
+        editCancelBtn.addEventListener('click', () => editForm.classList.add('hidden'));
+        editSaveBtn.addEventListener('click', () => {
+          const newText = editTextInput.value.trim();
+          if (!newText) {
+            editTextInput.focus();
+            return;
+          }
+          updateItemContent(item, newText, editMemoTextarea.value.trim());
+        });
 
         leaf.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', item.__key);

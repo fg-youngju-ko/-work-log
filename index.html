@@ -311,6 +311,18 @@
   }
   .memo-trigger:hover .memo-popup { display: block; }
   .memo-edit { margin-top: 8px; }
+  .memo-edit input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-family: inherit;
+    font-size: 13.5px;
+    background: transparent;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
   .memo-edit textarea {
     width: 100%;
     min-height: 60px;
@@ -1643,6 +1655,7 @@
           </div>
           <div class="todo-meta">생성 ${formatKoreanShort(item.createdAt)}</div>
           <div class="memo-edit hidden">
+            <input type="text" class="memo-text-input" placeholder="할 일 내용">
             <textarea class="memo-textarea" placeholder="상세 메모를 입력하세요"></textarea>
             <div class="memo-edit-actions">
               <label class="memo-category-label">카테고리 <select class="memo-category-select"></select></label>
@@ -1673,6 +1686,7 @@
     const memoLabel = li.querySelector('.memo-trigger-label');
     const memoPopup = li.querySelector('.memo-popup');
     const memoEdit = li.querySelector('.memo-edit');
+    const memoTextInput = li.querySelector('.memo-text-input');
     const memoTextarea = li.querySelector('.memo-textarea');
     const memoCategorySelect = li.querySelector('.memo-category-select');
 
@@ -1681,16 +1695,22 @@
     buildCategoryOptions(memoCategorySelect, item.category || '');
 
     memoTrigger.addEventListener('click', () => {
+      memoTextInput.value = item.text;
       memoTextarea.value = item.memo || '';
       buildCategoryOptions(memoCategorySelect, item.category || '');
       memoEdit.classList.toggle('hidden');
-      if (!memoEdit.classList.contains('hidden')) memoTextarea.focus();
+      if (!memoEdit.classList.contains('hidden')) memoTextInput.focus();
     });
     li.querySelector('.memo-cancel-btn').addEventListener('click', () => {
       memoEdit.classList.add('hidden');
     });
     li.querySelector('.memo-save-btn').addEventListener('click', () => {
-      handlers.onSaveMemo(item, memoTextarea.value.trim(), memoCategorySelect.value || null);
+      const newText = memoTextInput.value.trim();
+      if (!newText) {
+        memoTextInput.focus();
+        return;
+      }
+      handlers.onSaveMemo(item, newText, memoTextarea.value.trim(), memoCategorySelect.value || null);
     });
   }
 
@@ -1777,8 +1797,8 @@
     render();
   }
 
-  function saveTodoMemo(id, memo, category) {
-    const todos = loadTodos().map((t) => (t.id === id ? { ...t, memo, category } : t));
+  function saveTodoMemo(id, text, memo, category) {
+    const todos = loadTodos().map((t) => (t.id === id ? { ...t, text, memo, category } : t));
     saveTodos(todos);
     renderTodos();
   }
@@ -1813,10 +1833,10 @@
     const handlers = {
       onComplete: (item) => (item.__source === 'calendar' ? completeCalendarEvent(item.id) : completeTodo(item.id)),
       onDelete: (item) => (item.__source === 'calendar' ? deleteCalendarEvent(item.id) : deleteTodo(item.id)),
-      onSaveMemo: (item, memo, category) =>
+      onSaveMemo: (item, text, memo, category) =>
         item.__source === 'calendar'
-          ? saveCalendarEventMemo(item.id, memo, category)
-          : saveTodoMemo(item.id, memo, category),
+          ? saveCalendarEventMemo(item.id, text, memo, category)
+          : saveTodoMemo(item.id, text, memo, category),
     };
 
     todoList.querySelectorAll('.todo-item').forEach((li) => {
@@ -1924,8 +1944,8 @@
     renderDailyTemplateList();
   }
 
-  function saveDailyMemo(id, memo, category) {
-    saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === id ? { ...t, memo, category } : t)));
+  function saveDailyMemo(id, text, memo, category) {
+    saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === id ? { ...t, text, memo, category } : t)));
     renderDaily();
     renderDailyTemplateList();
   }
@@ -1964,7 +1984,7 @@
     const handlers = {
       onComplete: (item) => completeDailyToday(item.id),
       onDelete: (item) => deleteDailyTemplate(item.id),
-      onSaveMemo: (item, memo, category) => saveDailyMemo(item.id, memo, category),
+      onSaveMemo: (item, text, memo, category) => saveDailyMemo(item.id, text, memo, category),
     };
 
     dailyList.querySelectorAll('.todo-item').forEach((li) => {
@@ -2173,8 +2193,8 @@
     renderTodos();
   }
 
-  function saveCalendarEventMemo(id, memo, category) {
-    saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === id ? { ...e, memo, category } : e)));
+  function saveCalendarEventMemo(id, text, memo, category) {
+    saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === id ? { ...e, text, memo, category } : e)));
     renderCalendar();
     renderTodos();
   }
