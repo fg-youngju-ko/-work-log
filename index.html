@@ -1956,16 +1956,33 @@
     renderDailyTemplateList();
   }
 
+  function toMondayIndex(day) {
+    return (day + 6) % 7;
+  }
+
+  // 매주 항목은 "정확히 그 요일"에만 보이던 걸 "그 요일이 되면 그 주가 끝날
+  // 때까지 체크 전엔 계속 보이도록" 수정 - 체크 안 했는데 날짜만 지나서
+  // 사라지는 문제 때문.
   function renderDaily() {
     const todayStr = getTodayStr();
     const todayWeekday = new Date().getDay();
-    const templates = loadDailyTemplates();
-    const completedTodayIds = new Set(
-      loadDailyCompletions().filter((c) => c.date === todayStr).map((c) => c.templateId)
+    const { start: weekStart, end: weekEnd } = getWeekRange(new Date());
+    const weekStartStr = toDatetimeLocalValue(weekStart).slice(0, 10);
+    const weekEndStr = toDatetimeLocalValue(weekEnd).slice(0, 10);
+    const completions = loadDailyCompletions();
+    const completedTodayIds = new Set(completions.filter((c) => c.date === todayStr).map((c) => c.templateId));
+    const completedThisWeekIds = new Set(
+      completions.filter((c) => c.date >= weekStartStr && c.date <= weekEndStr).map((c) => c.templateId)
     );
+    const todayMondayIdx = toMondayIndex(todayWeekday);
 
+    const templates = loadDailyTemplates();
     const active = templates
-      .filter((t) => (t.frequency === 'daily' || t.weekday === todayWeekday) && !completedTodayIds.has(t.id))
+      .filter((t) => {
+        if (t.frequency === 'daily') return !completedTodayIds.has(t.id);
+        const reached = todayMondayIdx >= toMondayIndex(t.weekday);
+        return reached && !completedThisWeekIds.has(t.id);
+      })
       .map((t) => ({ ...t, __key: `daily:${t.id}` }))
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 

@@ -432,14 +432,42 @@
   function getRegularTodoItems() {
     return loadTodos().map((t) => ({ ...t, __source: 'todo', __key: `todo:${t.id}` }));
   }
+  function toMondayIndex(day) {
+    return (day + 6) % 7;
+  }
+  function getWeekRangeStrings(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const start = new Date(d);
+    start.setDate(d.getDate() + diffToMonday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const pad = (n) => String(n).padStart(2, '0');
+    const fmt = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    return { startStr: fmt(start), endStr: fmt(end) };
+  }
+
+  // 매주 항목은 "정확히 그 요일"에만 보이던 걸 "그 요일이 되면 그 주가 끝날
+  // 때까지 체크 전엔 계속 보이도록" 수정(index.html의 renderDaily()와 동일한 수정).
   function getActiveDailyItems() {
     const todayStr = getTodayStr();
     const todayWeekday = new Date().getDay();
-    const completedTodayIds = new Set(
-      loadDailyCompletions().filter((c) => c.date === todayStr).map((c) => c.templateId)
+    const { startStr: weekStartStr, endStr: weekEndStr } = getWeekRangeStrings(new Date());
+    const completions = loadDailyCompletions();
+    const completedTodayIds = new Set(completions.filter((c) => c.date === todayStr).map((c) => c.templateId));
+    const completedThisWeekIds = new Set(
+      completions.filter((c) => c.date >= weekStartStr && c.date <= weekEndStr).map((c) => c.templateId)
     );
+    const todayMondayIdx = toMondayIndex(todayWeekday);
+
     return loadDailyTemplates()
-      .filter((t) => (t.frequency === 'daily' || t.weekday === todayWeekday) && !completedTodayIds.has(t.id))
+      .filter((t) => {
+        if (t.frequency === 'daily') return !completedTodayIds.has(t.id);
+        const reached = todayMondayIdx >= toMondayIndex(t.weekday);
+        return reached && !completedThisWeekIds.has(t.id);
+      })
       .map((t) => ({
         ...t,
         __source: 'daily',
