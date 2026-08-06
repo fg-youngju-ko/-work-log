@@ -341,31 +341,29 @@
     margin-bottom: 10px;
   }
   .timetable-body {
+    display: grid;
+    grid-auto-rows: minmax(24px, auto);
     border: 1px solid var(--border);
     border-radius: 10px;
     overflow: hidden;
   }
-  .tt-row { display: flex; border-bottom: 1px solid var(--border); min-height: 28px; }
-  .tt-row:last-child { border-bottom: none; }
-  .tt-row.tt-now { background: var(--accent-wash); }
   .tt-time {
-    width: 52px;
-    flex-shrink: 0;
     font-size: 10.5px;
     color: var(--text-muted);
     padding: 3px 6px;
     text-align: right;
     border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
   }
+  .tt-time.tt-now, .tt-slot.tt-now { background: var(--accent-wash); }
   .tt-slot {
-    flex: 1;
     min-width: 0;
-    padding: 3px 6px;
+    padding: 2px 4px;
     display: flex;
-    flex-direction: column;
-    gap: 3px;
+    align-items: flex-start;
     cursor: pointer;
     position: relative;
+    border-bottom: 1px solid var(--border);
   }
   .tt-slot.drag-over { background: var(--accent-wash); }
   .tt-collapsed {
@@ -383,18 +381,20 @@
   .tt-collapsed:hover { background: var(--accent-wash); }
   .tt-chip {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 5px;
     padding: 2px 7px;
+    margin: 1px 2px;
     border-radius: 6px;
     border-left: 3px solid var(--accent);
     background: var(--bg);
+    box-shadow: var(--shadow);
     font-size: 11.5px;
     cursor: pointer;
-    max-width: 100%;
+    overflow: hidden;
   }
   .tt-chip-check {
-    margin: 0;
+    margin: 2px 0 0;
     accent-color: var(--accent);
     flex-shrink: 0;
     cursor: pointer;
@@ -404,16 +404,8 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .tt-chip-text.has-memo { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
-  .tt-chip-cont {
-    height: 6px;
-    border-left: 3px solid var(--accent);
-    background: var(--bg);
-    border-radius: 2px;
-    opacity: 0.6;
-  }
   .tt-quick-add input {
     width: 100%;
     box-sizing: border-box;
@@ -1127,11 +1119,45 @@
     const rows = [];
     for (let i = 0; i < 48; i++) {
       const slotStart = i * 30;
-      const starting = items.filter((it) => it.start === slotStart);
-      const continuing = items.filter((it) => it.start < slotStart && it.start + it.minutes > slotStart);
-      rows.push({ index: i, slotStart, starting, continuing, hasAny: starting.length > 0 || continuing.length > 0 });
+      const hasAny = items.some((it) => it.start <= slotStart && slotStart < it.start + it.minutes);
+      rows.push({ index: i, slotStart, hasAny });
     }
     return rows;
+  }
+
+  // 겹치는 항목들을 "레인"에 배정한다(구간 그래프 그리디 채색). 서로 안 겹치는
+  // 항목은 레인 0을 재사용해 전체 폭을 쓰고, 실제로 어떤 항목과든 겹치는 것만
+  // 자기 레인 폭으로 좁혀 나란히 배치한다.
+  function assignLanes(items) {
+    const sorted = [...items].sort((a, b) => a.start - b.start || a.minutes - b.minutes);
+    const laneEndTimes = [];
+    const laneByKey = new Map();
+    sorted.forEach((it) => {
+      const end = it.start + it.minutes;
+      let assigned = -1;
+      for (let i = 0; i < laneEndTimes.length; i++) {
+        if (laneEndTimes[i] <= it.start) {
+          assigned = i;
+          break;
+        }
+      }
+      if (assigned === -1) {
+        assigned = laneEndTimes.length;
+        laneEndTimes.push(end);
+      } else {
+        laneEndTimes[assigned] = end;
+      }
+      laneByKey.set(it.__key, assigned);
+    });
+    const maxLanes = Math.max(1, laneEndTimes.length);
+
+    const overlaps = (a, b) => a.start < b.start + b.minutes && b.start < a.start + a.minutes;
+    const overlapsAnyByKey = new Map();
+    sorted.forEach((it) => {
+      overlapsAnyByKey.set(it.__key, sorted.some((other) => other.__key !== it.__key && overlaps(it, other)));
+    });
+
+    return { maxLanes, laneByKey, overlapsAnyByKey };
   }
 
   function populateTimetableEditSelects() {
@@ -1223,67 +1249,18 @@
     input.addEventListener('blur', commit);
   }
 
-  function buildTimetableRowEl(dateStr, row, isNowRow) {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'tt-row' + (isNowRow ? ' tt-now' : '');
-
-    const timeEl = document.createElement('div');
-    timeEl.className = 'tt-time';
-    timeEl.textContent = row.slotStart % 60 === 0 ? minutesToLabel(row.slotStart) : '';
-    rowEl.appendChild(timeEl);
-
+  // 시간칸 배경(드롭/빈칸클릭용) 하나를 만든다. 실제 항목 블록은 이후 별도로
+  // grid-row/grid-column을 겹쳐서 그 위에 얹는다.
+  function buildSlotBackgroundEl(dateStr, row, gridRow, isNowRow) {
     const slotEl = document.createElement('div');
-    slotEl.className = 'tt-slot';
-
-    row.continuing.forEach((it) => {
-      const bar = document.createElement('div');
-      bar.className = 'tt-chip-cont';
-      const color = getCategoryTagColor(it.category);
-      if (color) bar.style.borderLeftColor = color.bg;
-      slotEl.appendChild(bar);
-    });
-
-    row.starting.forEach((it) => {
-      const chip = document.createElement('div');
-      chip.className = 'tt-chip';
-      chip.draggable = true;
-      const color = getCategoryTagColor(it.category);
-      if (color) chip.style.borderLeftColor = color.bg;
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'tt-chip-check';
-      checkbox.addEventListener('click', (e) => e.stopPropagation());
-      checkbox.addEventListener('change', (e) => {
-        if (e.target.checked) completeItem(it);
-      });
-      chip.appendChild(checkbox);
-
-      const textEl = document.createElement('span');
-      textEl.className = 'tt-chip-text';
-      textEl.textContent = it.text;
-      if (it.memo) {
-        textEl.classList.add('has-memo');
-        textEl.addEventListener('mouseenter', () => showMemoPopup(textEl, it.memo));
-        textEl.addEventListener('mouseleave', hideMemoPopup);
-      }
-      chip.appendChild(textEl);
-
-      chip.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openTimetableEditForm(chip, it, dateStr);
-      });
-      chip.addEventListener('dragstart', (e) => {
-        e.stopPropagation();
-        e.dataTransfer.setData('text/plain', it.__key);
-      });
-      slotEl.appendChild(chip);
-    });
-
-    if (!row.starting.length && !row.continuing.length) {
+    slotEl.className = 'tt-slot' + (isNowRow ? ' tt-now' : '');
+    slotEl.style.gridRow = String(gridRow);
+    slotEl.style.gridColumn = '2 / -1';
+    if (row.hasAny) {
+      slotEl.style.cursor = 'default';
+    } else {
       slotEl.addEventListener('click', () => openQuickAdd(slotEl, dateStr, row.slotStart));
     }
-
     slotEl.addEventListener('dragover', (e) => {
       e.preventDefault();
       slotEl.classList.add('drag-over');
@@ -1299,9 +1276,67 @@
         updateItemSchedule(item, dateStr, row.slotStart, prevMinutes);
       }
     });
+    return slotEl;
+  }
 
-    rowEl.appendChild(slotEl);
-    return rowEl;
+  // 항목 블록: grid-row를 span해서 진짜 이어진 하나의 칸으로 보이게 하고,
+  // 다른 항목과 실제로 겹칠 때만 자기 레인(열)만큼 좁혀 나란히 배치한다.
+  function buildItemBlockEl(dateStr, it, startGridRow, rowSpan, laneInfo) {
+    const chip = document.createElement('div');
+    chip.className = 'tt-chip';
+    chip.draggable = true;
+    chip.style.gridRow = `${startGridRow} / span ${rowSpan}`;
+    if (laneInfo.overlapsAnyByKey.get(it.__key)) {
+      chip.style.gridColumn = String(laneInfo.laneByKey.get(it.__key) + 2);
+    } else {
+      chip.style.gridColumn = '2 / -1';
+    }
+    const color = getCategoryTagColor(it.category);
+    if (color) chip.style.borderLeftColor = color.bg;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'tt-chip-check';
+    checkbox.addEventListener('click', (e) => e.stopPropagation());
+    checkbox.addEventListener('change', (e) => {
+      if (e.target.checked) completeItem(it);
+    });
+    chip.appendChild(checkbox);
+
+    const textEl = document.createElement('span');
+    textEl.className = 'tt-chip-text';
+    textEl.textContent = it.text;
+    if (it.memo) {
+      textEl.classList.add('has-memo');
+      textEl.addEventListener('mouseenter', () => showMemoPopup(textEl, it.memo));
+      textEl.addEventListener('mouseleave', hideMemoPopup);
+    }
+    chip.appendChild(textEl);
+
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTimetableEditForm(chip, it, dateStr);
+    });
+    chip.addEventListener('dragstart', (e) => {
+      e.stopPropagation();
+      e.dataTransfer.setData('text/plain', it.__key);
+    });
+    // 이미 항목이 있는 칸 위로도 드롭 가능하게 - 같은 시작 시간으로 배정되어
+    // 결국 다음 렌더에서 자동으로 레인이 나뉘어 나란히 보이게 된다.
+    chip.addEventListener('dragover', (e) => e.preventDefault());
+    chip.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = e.dataTransfer.getData('text/plain');
+      if (key === it.__key) return;
+      const draggedItem = findDraggableItemByKey(key);
+      if (draggedItem) {
+        const prevMinutes = Number.isInteger(draggedItem.scheduledMinutes) ? draggedItem.scheduledMinutes : 30;
+        updateItemSchedule(draggedItem, dateStr, it.start, prevMinutes);
+      }
+    });
+
+    return chip;
   }
 
   function renderTimetable() {
@@ -1311,14 +1346,20 @@
     const items = getScheduledItemsForDate(dateStr);
     const rows = buildTimetableRows(items);
     const nowSlotIndex = getNowSlotIndexIfToday(dateStr);
+    const laneInfo = assignLanes(items);
 
     timetableBody.innerHTML = '';
-    let i = 0;
+    timetableBody.style.gridTemplateColumns = `52px repeat(${laneInfo.maxLanes}, 1fr)`;
+
     // 접힌 구간을 부분적으로만 펼치는 버그 방지: 세그먼트가 아니라 "칸 단위"로
     // 펼침 여부를 기억한다(펼칠 때 구간에 속한 모든 칸의 키를 한 번에 추가).
     const isCollapsible = (r) => !r.hasAny && r.index !== nowSlotIndex && !expandedSegments.has(`${dateStr}:${r.index}`);
+    const slotToGridRow = new Map();
+    let gridRow = 0;
+    let i = 0;
     while (i < rows.length) {
       const row = rows[i];
+      gridRow++;
       if (isCollapsible(row)) {
         let j = i;
         while (j < rows.length && isCollapsible(rows[j])) j++;
@@ -1328,6 +1369,8 @@
           const rangeEnd = j;
           const bar = document.createElement('div');
           bar.className = 'tt-collapsed';
+          bar.style.gridRow = String(gridRow);
+          bar.style.gridColumn = '1 / -1';
           bar.textContent = `⋯ ${minutesToLabel(rows[i].slotStart)}~${minutesToLabel(rows[j - 1].slotStart + 30)} 빈 시간대 펼치기`;
           bar.addEventListener('click', () => {
             for (let k = rangeStart; k < rangeEnd; k++) expandedSegments.add(`${dateStr}:${rows[k].index}`);
@@ -1338,9 +1381,26 @@
           continue;
         }
       }
-      timetableBody.appendChild(buildTimetableRowEl(dateStr, row, row.index === nowSlotIndex));
+      const isNowRow = row.index === nowSlotIndex;
+      const timeEl = document.createElement('div');
+      timeEl.className = 'tt-time' + (isNowRow ? ' tt-now' : '');
+      timeEl.style.gridRow = String(gridRow);
+      timeEl.style.gridColumn = '1';
+      timeEl.textContent = row.slotStart % 60 === 0 ? minutesToLabel(row.slotStart) : '';
+      timetableBody.appendChild(timeEl);
+      timetableBody.appendChild(buildSlotBackgroundEl(dateStr, row, gridRow, isNowRow));
+      slotToGridRow.set(row.index, gridRow);
       i++;
     }
+
+    items.forEach((it) => {
+      const startGridRow = slotToGridRow.get(it.start / 30);
+      if (!startGridRow) return;
+      const endSlotIdx = Math.min(it.start / 30 + it.minutes / 30 - 1, 47);
+      const endGridRow = slotToGridRow.get(endSlotIdx) || startGridRow;
+      const rowSpan = Math.max(1, endGridRow - startGridRow + 1);
+      timetableBody.appendChild(buildItemBlockEl(dateStr, it, startGridRow, rowSpan, laneInfo));
+    });
 
     const totalMinutes = items.reduce((sum, it) => sum + it.minutes, 0);
     if (!items.length) {
