@@ -51,7 +51,19 @@
     background: var(--bg);
     color: var(--text);
   }
-  .app { max-width: 1100px; margin: 0 auto; padding: 32px 20px 80px; }
+  .app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  .left-col, .right-col { min-width: 0; }
+  @media (max-width: 1000px) {
+    .app { grid-template-columns: 1fr; max-width: 700px; }
+  }
   header {
     display: flex;
     align-items: center;
@@ -294,10 +306,171 @@
     text-align: center;
     margin-top: 24px;
   }
+
+  .timetable-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 18px;
+  }
+  .timetable-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .timetable-header h2 { font-size: 15px; margin: 0; }
+  .timetable-nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .timetable-nav button {
+    background: var(--border);
+    color: var(--text);
+    border: none;
+    border-radius: 7px;
+    padding: 4px 9px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .timetable-nav button:hover { opacity: 0.85; }
+  #ttDateLabel { font-size: 12.5px; font-weight: 700; padding: 0 2px; }
+  .timetable-summary {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .timetable-body {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .tt-row { display: flex; border-bottom: 1px solid var(--border); min-height: 28px; }
+  .tt-row:last-child { border-bottom: none; }
+  .tt-row.tt-now { background: var(--accent-wash); }
+  .tt-time {
+    width: 52px;
+    flex-shrink: 0;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    padding: 3px 6px;
+    text-align: right;
+    border-right: 1px solid var(--border);
+  }
+  .tt-slot {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    cursor: pointer;
+    position: relative;
+  }
+  .tt-slot.drag-over { background: var(--accent-wash); }
+  .tt-collapsed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .tt-collapsed:hover { background: var(--accent-wash); }
+  .tt-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    border-left: 3px solid var(--accent);
+    background: var(--bg);
+    font-size: 11.5px;
+    cursor: pointer;
+    max-width: 100%;
+  }
+  .tt-chip-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tt-chip-cont {
+    height: 6px;
+    border-left: 3px solid var(--accent);
+    background: var(--bg);
+    border-radius: 2px;
+    opacity: 0.6;
+  }
+  .tt-quick-add input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .tt-edit-form {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 10px;
+    width: 220px;
+  }
+  .tt-edit-form.open { display: block; }
+  .tt-edit-form input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-family: inherit;
+    font-size: 12.5px;
+    background: transparent;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .tt-edit-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .tt-edit-row select {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 4px;
+    font-family: inherit;
+    font-size: 11.5px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .tt-edit-actions { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .tt-edit-actions-right { display: flex; gap: 6px; }
+  .tt-edit-actions button {
+    padding: 4px 8px;
+    font-size: 11px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .tt-unschedule-btn { background: var(--border); color: var(--text); }
+  .tt-edit-cancel-btn { background: var(--border); color: var(--text); }
+  .tt-edit-save-btn { background: var(--accent); color: var(--accent-text); }
 </style>
 </head>
 <body>
 <div class="app">
+<div class="left-col">
   <header>
     <h1>🧠 TODO 마인드맵</h1>
     <a class="back-link" href="index.html">← 업무일지로</a>
@@ -327,7 +500,45 @@
     대제목의 ✎(수정)/×(삭제)는 헤더 우측에 있습니다.
   </p>
 </div>
+
+<div class="right-col">
+  <section class="timetable-card">
+    <div class="timetable-header">
+      <h2>🕐 일일 시간표</h2>
+      <div class="timetable-nav">
+        <button type="button" id="ttPrevBtn">‹</button>
+        <span id="ttDateLabel"></span>
+        <button type="button" id="ttNextBtn">›</button>
+        <button type="button" id="ttTodayBtn">오늘</button>
+        <button type="button" id="ttTomorrowBtn">내일</button>
+      </div>
+    </div>
+    <div class="timetable-summary" id="timetableSummary"></div>
+    <div class="timetable-body" id="timetableBody"></div>
+  </section>
+  <p class="hint">
+    왼쪽 마인드맵의 항목을 드래그해서 원하는 시간칸에 놓으면 배정됩니다. 배정된 항목을 클릭하면
+    시작 시간/기간을 조정하거나 시간 배정만 해제(삭제 아님)할 수 있습니다. 빈 시간칸을 클릭하면
+    그 시간에 바로 새 할 일을 추가합니다. 데일리 업무는 시간을 한 번 정해두면 활성화되는 날마다
+    자동으로 그 시간에 나타나며, 언제든 다시 수정할 수 있습니다.
+  </p>
+</div>
+</div>
 <div id="floatingMemoPopup"></div>
+<div id="ttEditForm" class="tt-edit-form">
+  <input type="text" id="ttEditText">
+  <div class="tt-edit-row">
+    <select id="ttEditStart"></select>
+    <select id="ttEditDuration"></select>
+  </div>
+  <div class="tt-edit-actions">
+    <button type="button" class="tt-unschedule-btn" id="ttUnscheduleBtn">시간 해제</button>
+    <div class="tt-edit-actions-right">
+      <button type="button" class="tt-edit-cancel-btn" id="ttEditCancelBtn">취소</button>
+      <button type="button" class="tt-edit-save-btn" id="ttEditSaveBtn">저장</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -370,6 +581,25 @@
   const hubNode = document.getElementById('hubNode');
   const branchRow = document.getElementById('branchRow');
   const floatingMemoPopup = document.getElementById('floatingMemoPopup');
+
+  const ttPrevBtn = document.getElementById('ttPrevBtn');
+  const ttNextBtn = document.getElementById('ttNextBtn');
+  const ttTodayBtn = document.getElementById('ttTodayBtn');
+  const ttTomorrowBtn = document.getElementById('ttTomorrowBtn');
+  const ttDateLabel = document.getElementById('ttDateLabel');
+  const timetableSummary = document.getElementById('timetableSummary');
+  const timetableBody = document.getElementById('timetableBody');
+  const ttEditForm = document.getElementById('ttEditForm');
+  const ttEditText = document.getElementById('ttEditText');
+  const ttEditStart = document.getElementById('ttEditStart');
+  const ttEditDuration = document.getElementById('ttEditDuration');
+  const ttEditCancelBtn = document.getElementById('ttEditCancelBtn');
+  const ttEditSaveBtn = document.getElementById('ttEditSaveBtn');
+  const ttUnscheduleBtn = document.getElementById('ttUnscheduleBtn');
+  let timetableViewDate = new Date();
+  let ttEditingItem = null;
+  let ttEditingDateStr = null;
+  const expandedSegments = new Set();
 
   // 타일(.branch)이 overflow:hidden이라 자식으로 팝업을 두면 경계에서 잘리므로,
   // body 바로 아래에 떠 있는 단일 팝업을 뷰포트 기준 좌표로 옮겨가며 재사용한다.
@@ -764,6 +994,387 @@
     });
   }
 
+  // ---- 일일 시간표 ----
+  // 시간 배정(scheduledDate/scheduledStart/scheduledMinutes)은 업무대제목(project)·
+  // 카테고리와 완전히 독립된 세 번째 축이다. TODO는 항목 자체에 scheduledDate를
+  // 갖고(날짜별로 다르게 배정 가능), Daily는 템플릿에 scheduledStart를 둬서
+  // "한 번 정하면 활성화되는 날마다 자동으로 그 시간"이 되도록 하고, 캘린더는
+  // 이미 있는 date 필드에 시간만 덧붙인다.
+  const DURATION_OPTIONS = [30, 60, 90, 120, 180, 240, 360, 480, 720, 1440];
+
+  function durationLabel(min) {
+    if (min >= 1440) return '종일';
+    if (min % 60 === 0) return `${min / 60}시간`;
+    return `${Math.floor(min / 60)}시간 ${min % 60}분`;
+  }
+  function minutesToLabel(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+  function dateStrOf(date) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+  function formatDateLabel(date) {
+    return `${date.getMonth() + 1}월 ${date.getDate()}일 (${WEEKDAY_LABELS[date.getDay()]})`;
+  }
+
+  function getScheduledItemsForDate(dateStr) {
+    const weekday = new Date(dateStr + 'T00:00:00').getDay();
+    const results = [];
+
+    loadTodos().forEach((t) => {
+      if (t.scheduledDate === dateStr && Number.isInteger(t.scheduledStart)) {
+        results.push({ ...t, __source: 'todo', __key: `todo:${t.id}`, start: t.scheduledStart, minutes: t.scheduledMinutes || 30 });
+      }
+    });
+
+    const completions = loadDailyCompletions();
+    loadDailyTemplates().forEach((t) => {
+      if (!Number.isInteger(t.scheduledStart)) return;
+      const due = t.frequency === 'daily' || t.weekday === weekday;
+      if (!due) return;
+      const completedOnDate = completions.some((c) => c.templateId === t.id && c.date === dateStr);
+      if (completedOnDate) return;
+      results.push({ ...t, __source: 'daily', __key: `daily:${t.id}`, start: t.scheduledStart, minutes: t.scheduledMinutes || 30 });
+    });
+
+    loadCalendarEvents().forEach((e) => {
+      if (e.date === dateStr && Number.isInteger(e.scheduledStart)) {
+        results.push({ ...e, __source: 'calendar', __key: `cal:${e.id}`, start: e.scheduledStart, minutes: e.scheduledMinutes || 30 });
+      }
+    });
+
+    return results;
+  }
+
+  // 드롭된 항목을 찾을 때 마인드맵의 "오늘 활성" 후보군 + 현재 보고 있는 날짜의
+  // 이미 배정된 항목까지 합쳐서 찾는다(그래야 내일 시간표 위에서 다시 옮기는
+  // 것도, 마인드맵에서 새로 끌어오는 것도 둘 다 찾아진다).
+  function findDraggableItemByKey(key) {
+    const pool = [
+      ...getRegularTodoItems(),
+      ...getActiveDailyItems(),
+      ...getTodayCalendarItems(),
+      ...getScheduledItemsForDate(dateStrOf(timetableViewDate)),
+    ];
+    return pool.find((it) => it.__key === key);
+  }
+
+  function updateItemSchedule(item, dateStr, startMinutes, minutes) {
+    if (item.__source === 'daily') {
+      saveDailyTemplates(
+        loadDailyTemplates().map((t) => (t.id === item.id ? { ...t, scheduledStart: startMinutes, scheduledMinutes: minutes } : t))
+      );
+    } else if (item.__source === 'calendar') {
+      saveCalendarEvents(
+        loadCalendarEvents().map((e) => (e.id === item.id ? { ...e, scheduledStart: startMinutes, scheduledMinutes: minutes } : e))
+      );
+    } else {
+      saveTodos(
+        loadTodos().map((t) =>
+          t.id === item.id ? { ...t, scheduledDate: dateStr, scheduledStart: startMinutes, scheduledMinutes: minutes } : t
+        )
+      );
+    }
+    render();
+  }
+
+  function unscheduleItem(item) {
+    if (item.__source === 'daily') {
+      saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === item.id ? { ...t, scheduledStart: null } : t)));
+    } else if (item.__source === 'calendar') {
+      saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === item.id ? { ...e, scheduledStart: null } : e)));
+    } else {
+      saveTodos(loadTodos().map((t) => (t.id === item.id ? { ...t, scheduledStart: null, scheduledDate: null } : t)));
+    }
+    render();
+  }
+
+  function getNowSlotIndexIfToday(dateStr) {
+    if (dateStr !== getTodayStr()) return -1;
+    const now = new Date();
+    return Math.floor((now.getHours() * 60 + now.getMinutes()) / 30);
+  }
+
+  function buildTimetableRows(items) {
+    const rows = [];
+    for (let i = 0; i < 48; i++) {
+      const slotStart = i * 30;
+      const starting = items.filter((it) => it.start === slotStart);
+      const continuing = items.filter((it) => it.start < slotStart && it.start + it.minutes > slotStart);
+      rows.push({ index: i, slotStart, starting, continuing, hasAny: starting.length > 0 || continuing.length > 0 });
+    }
+    return rows;
+  }
+
+  function populateTimetableEditSelects() {
+    ttEditStart.innerHTML = '';
+    for (let i = 0; i < 48; i++) {
+      const opt = document.createElement('option');
+      opt.value = String(i * 30);
+      opt.textContent = minutesToLabel(i * 30);
+      ttEditStart.appendChild(opt);
+    }
+    ttEditDuration.innerHTML = '';
+    DURATION_OPTIONS.forEach((m) => {
+      const opt = document.createElement('option');
+      opt.value = String(m);
+      opt.textContent = durationLabel(m);
+      ttEditDuration.appendChild(opt);
+    });
+  }
+
+  function closeTimetableEditForm() {
+    ttEditForm.classList.remove('open');
+    ttEditingItem = null;
+    ttEditingDateStr = null;
+  }
+
+  function openTimetableEditForm(chipEl, item, dateStr) {
+    ttEditingItem = item;
+    ttEditingDateStr = dateStr;
+    ttEditText.value = item.text;
+    ttEditForm.classList.add('open');
+    ttEditStart.value = String(item.start);
+    ttEditDuration.value = String(DURATION_OPTIONS.includes(item.minutes) ? item.minutes : 30);
+
+    const rect = chipEl.getBoundingClientRect();
+    const formRect = ttEditForm.getBoundingClientRect();
+    let top = rect.bottom + 6;
+    if (top + formRect.height > window.innerHeight - 8) top = Math.max(8, rect.top - formRect.height - 6);
+    let left = rect.left;
+    const maxLeft = window.innerWidth - formRect.width - 8;
+    if (left > maxLeft) left = Math.max(8, maxLeft);
+    ttEditForm.style.top = `${top}px`;
+    ttEditForm.style.left = `${left}px`;
+    ttEditText.focus();
+  }
+
+  function openQuickAdd(slotEl, dateStr, slotStart) {
+    slotEl.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tt-quick-add';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = `${minutesToLabel(slotStart)}에 할 일 추가`;
+    wrap.appendChild(input);
+    slotEl.appendChild(wrap);
+    input.focus();
+
+    let done = false;
+    function commit() {
+      if (done) return;
+      done = true;
+      const text = input.value.trim();
+      if (!text) {
+        renderTimetable();
+        return;
+      }
+      const todos = loadTodos();
+      todos.push({
+        id: crypto.randomUUID(),
+        text,
+        memo: '',
+        category: null,
+        project: null,
+        scheduledDate: dateStr,
+        scheduledStart: slotStart,
+        scheduledMinutes: 30,
+        createdAt: new Date().toISOString(),
+      });
+      saveTodos(todos);
+      render();
+    }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commit();
+      if (e.key === 'Escape') {
+        done = true;
+        renderTimetable();
+      }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  function buildTimetableRowEl(dateStr, row, isNowRow) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'tt-row' + (isNowRow ? ' tt-now' : '');
+
+    const timeEl = document.createElement('div');
+    timeEl.className = 'tt-time';
+    timeEl.textContent = row.slotStart % 60 === 0 ? minutesToLabel(row.slotStart) : '';
+    rowEl.appendChild(timeEl);
+
+    const slotEl = document.createElement('div');
+    slotEl.className = 'tt-slot';
+
+    row.continuing.forEach((it) => {
+      const bar = document.createElement('div');
+      bar.className = 'tt-chip-cont';
+      const color = getCategoryTagColor(it.category);
+      if (color) bar.style.borderLeftColor = color.bg;
+      slotEl.appendChild(bar);
+    });
+
+    row.starting.forEach((it) => {
+      const chip = document.createElement('div');
+      chip.className = 'tt-chip';
+      chip.draggable = true;
+      const color = getCategoryTagColor(it.category);
+      if (color) chip.style.borderLeftColor = color.bg;
+      const textEl = document.createElement('span');
+      textEl.className = 'tt-chip-text';
+      textEl.textContent = it.text;
+      chip.appendChild(textEl);
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openTimetableEditForm(chip, it, dateStr);
+      });
+      chip.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        e.dataTransfer.setData('text/plain', it.__key);
+      });
+      slotEl.appendChild(chip);
+    });
+
+    if (!row.starting.length && !row.continuing.length) {
+      slotEl.addEventListener('click', () => openQuickAdd(slotEl, dateStr, row.slotStart));
+    }
+
+    slotEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      slotEl.classList.add('drag-over');
+    });
+    slotEl.addEventListener('dragleave', () => slotEl.classList.remove('drag-over'));
+    slotEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      slotEl.classList.remove('drag-over');
+      const key = e.dataTransfer.getData('text/plain');
+      const item = findDraggableItemByKey(key);
+      if (item) {
+        const prevMinutes = Number.isInteger(item.scheduledMinutes) ? item.scheduledMinutes : 30;
+        updateItemSchedule(item, dateStr, row.slotStart, prevMinutes);
+      }
+    });
+
+    rowEl.appendChild(slotEl);
+    return rowEl;
+  }
+
+  function renderTimetable() {
+    const dateStr = dateStrOf(timetableViewDate);
+    ttDateLabel.textContent = formatDateLabel(timetableViewDate);
+
+    const items = getScheduledItemsForDate(dateStr);
+    const rows = buildTimetableRows(items);
+    const nowSlotIndex = getNowSlotIndexIfToday(dateStr);
+
+    timetableBody.innerHTML = '';
+    let i = 0;
+    // 접힌 구간을 부분적으로만 펼치는 버그 방지: 세그먼트가 아니라 "칸 단위"로
+    // 펼침 여부를 기억한다(펼칠 때 구간에 속한 모든 칸의 키를 한 번에 추가).
+    const isCollapsible = (r) => !r.hasAny && r.index !== nowSlotIndex && !expandedSegments.has(`${dateStr}:${r.index}`);
+    while (i < rows.length) {
+      const row = rows[i];
+      if (isCollapsible(row)) {
+        let j = i;
+        while (j < rows.length && isCollapsible(rows[j])) j++;
+        const runLength = j - i;
+        if (runLength >= 2) {
+          const rangeStart = i;
+          const rangeEnd = j;
+          const bar = document.createElement('div');
+          bar.className = 'tt-collapsed';
+          bar.textContent = `⋯ ${minutesToLabel(rows[i].slotStart)}~${minutesToLabel(rows[j - 1].slotStart + 30)} 빈 시간대 펼치기`;
+          bar.addEventListener('click', () => {
+            for (let k = rangeStart; k < rangeEnd; k++) expandedSegments.add(`${dateStr}:${rows[k].index}`);
+            renderTimetable();
+          });
+          timetableBody.appendChild(bar);
+          i = j;
+          continue;
+        }
+      }
+      timetableBody.appendChild(buildTimetableRowEl(dateStr, row, row.index === nowSlotIndex));
+      i++;
+    }
+
+    const totalMinutes = items.reduce((sum, it) => sum + it.minutes, 0);
+    if (!items.length) {
+      timetableSummary.textContent = '배정된 일정이 없습니다.';
+    } else {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      const durationText = [h > 0 ? `${h}시간` : '', m > 0 ? `${m}분` : ''].filter(Boolean).join(' ') || '0분';
+      timetableSummary.textContent = `배정된 일정 ${items.length}건 · 총 ${durationText}`;
+    }
+  }
+
+  ttPrevBtn.addEventListener('click', () => {
+    timetableViewDate = new Date(timetableViewDate);
+    timetableViewDate.setDate(timetableViewDate.getDate() - 1);
+    renderTimetable();
+  });
+  ttNextBtn.addEventListener('click', () => {
+    timetableViewDate = new Date(timetableViewDate);
+    timetableViewDate.setDate(timetableViewDate.getDate() + 1);
+    renderTimetable();
+  });
+  ttTodayBtn.addEventListener('click', () => {
+    timetableViewDate = new Date();
+    renderTimetable();
+  });
+  ttTomorrowBtn.addEventListener('click', () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    timetableViewDate = d;
+    renderTimetable();
+  });
+  ttEditCancelBtn.addEventListener('click', closeTimetableEditForm);
+  ttEditSaveBtn.addEventListener('click', () => {
+    if (!ttEditingItem) return;
+    const text = ttEditText.value.trim();
+    if (!text) {
+      ttEditText.focus();
+      return;
+    }
+    const startMinutes = Number(ttEditStart.value);
+    const durationMinutes = Number(ttEditDuration.value);
+    if (ttEditingItem.__source === 'daily') {
+      saveDailyTemplates(
+        loadDailyTemplates().map((t) =>
+          t.id === ttEditingItem.id ? { ...t, text, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : t
+        )
+      );
+    } else if (ttEditingItem.__source === 'calendar') {
+      saveCalendarEvents(
+        loadCalendarEvents().map((e) =>
+          e.id === ttEditingItem.id ? { ...e, text, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : e
+        )
+      );
+    } else {
+      saveTodos(
+        loadTodos().map((t) =>
+          t.id === ttEditingItem.id
+            ? { ...t, text, scheduledDate: ttEditingDateStr, scheduledStart: startMinutes, scheduledMinutes: durationMinutes }
+            : t
+        )
+      );
+    }
+    closeTimetableEditForm();
+    render();
+  });
+  ttUnscheduleBtn.addEventListener('click', () => {
+    if (!ttEditingItem) return;
+    unscheduleItem(ttEditingItem);
+    closeTimetableEditForm();
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.tt-chip') || e.target.closest('.tt-edit-form')) return;
+    closeTimetableEditForm();
+  });
+
   // 마인드맵의 가지(대제목) = 업무대제목(workLog.projects), 기존 카테고리와는 별개.
   // 각 항목(leaf)은 자신이 속한 대제목 아래에 나타나되, 원래 카테고리는 참고용
   // 태그로만 함께 표시한다(여기서는 카테고리 자체를 수정하지 않음).
@@ -964,6 +1575,7 @@
     });
 
     drawConnectors();
+    renderTimetable();
   }
 
   addTodoBtn.addEventListener('click', addTodo);
@@ -980,6 +1592,7 @@
   }
 
   populateNewTodoCategorySelect();
+  populateTimetableEditSelects();
   render();
 })();
 </script>
