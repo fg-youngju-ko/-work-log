@@ -362,7 +362,6 @@
     display: flex;
     align-items: flex-start;
     cursor: pointer;
-    position: relative;
     border-bottom: 1px solid var(--border);
   }
   .tt-slot.drag-over { background: var(--accent-wash); }
@@ -380,6 +379,8 @@
   }
   .tt-collapsed:hover { background: var(--accent-wash); }
   .tt-chip {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: flex-start;
     gap: 5px;
