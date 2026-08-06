@@ -393,6 +393,12 @@
     cursor: pointer;
     max-width: 100%;
   }
+  .tt-chip-check {
+    margin: 0;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
   .tt-chip-text {
     flex: 1;
     min-width: 0;
@@ -400,6 +406,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .tt-chip-text.has-memo { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
   .tt-chip-cont {
     height: 6px;
     border-left: 3px solid var(--accent);
@@ -430,6 +437,20 @@
     width: 220px;
   }
   .tt-edit-form.open { display: block; }
+  .tt-edit-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-family: inherit;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text);
+    resize: vertical;
+    margin-bottom: 6px;
+  }
   .tt-edit-form input[type="text"] {
     width: 100%;
     box-sizing: border-box;
@@ -511,6 +532,7 @@
         <button type="button" id="ttNextBtn">›</button>
         <button type="button" id="ttTodayBtn">오늘</button>
         <button type="button" id="ttTomorrowBtn">내일</button>
+        <button type="button" id="ttCollapseBtn">빈 시간 접기</button>
       </div>
     </div>
     <div class="timetable-summary" id="timetableSummary"></div>
@@ -527,6 +549,7 @@
 <div id="floatingMemoPopup"></div>
 <div id="ttEditForm" class="tt-edit-form">
   <input type="text" id="ttEditText">
+  <textarea id="ttEditMemo" placeholder="상세 메모"></textarea>
   <div class="tt-edit-row">
     <select id="ttEditStart"></select>
     <select id="ttEditDuration"></select>
@@ -586,11 +609,13 @@
   const ttNextBtn = document.getElementById('ttNextBtn');
   const ttTodayBtn = document.getElementById('ttTodayBtn');
   const ttTomorrowBtn = document.getElementById('ttTomorrowBtn');
+  const ttCollapseBtn = document.getElementById('ttCollapseBtn');
   const ttDateLabel = document.getElementById('ttDateLabel');
   const timetableSummary = document.getElementById('timetableSummary');
   const timetableBody = document.getElementById('timetableBody');
   const ttEditForm = document.getElementById('ttEditForm');
   const ttEditText = document.getElementById('ttEditText');
+  const ttEditMemo = document.getElementById('ttEditMemo');
   const ttEditStart = document.getElementById('ttEditStart');
   const ttEditDuration = document.getElementById('ttEditDuration');
   const ttEditCancelBtn = document.getElementById('ttEditCancelBtn');
@@ -1136,6 +1161,7 @@
     ttEditingItem = item;
     ttEditingDateStr = dateStr;
     ttEditText.value = item.text;
+    ttEditMemo.value = item.memo || '';
     ttEditForm.classList.add('open');
     ttEditStart.value = String(item.start);
     ttEditDuration.value = String(DURATION_OPTIONS.includes(item.minutes) ? item.minutes : 30);
@@ -1223,10 +1249,26 @@
       chip.draggable = true;
       const color = getCategoryTagColor(it.category);
       if (color) chip.style.borderLeftColor = color.bg;
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'tt-chip-check';
+      checkbox.addEventListener('click', (e) => e.stopPropagation());
+      checkbox.addEventListener('change', (e) => {
+        if (e.target.checked) completeItem(it);
+      });
+      chip.appendChild(checkbox);
+
       const textEl = document.createElement('span');
       textEl.className = 'tt-chip-text';
       textEl.textContent = it.text;
+      if (it.memo) {
+        textEl.classList.add('has-memo');
+        textEl.addEventListener('mouseenter', () => showMemoPopup(textEl, it.memo));
+        textEl.addEventListener('mouseleave', hideMemoPopup);
+      }
       chip.appendChild(textEl);
+
       chip.addEventListener('click', (e) => {
         e.stopPropagation();
         openTimetableEditForm(chip, it, dateStr);
@@ -1331,6 +1373,13 @@
     timetableViewDate = d;
     renderTimetable();
   });
+  ttCollapseBtn.addEventListener('click', () => {
+    const dateStr = dateStrOf(timetableViewDate);
+    [...expandedSegments].forEach((key) => {
+      if (key.startsWith(`${dateStr}:`)) expandedSegments.delete(key);
+    });
+    renderTimetable();
+  });
   ttEditCancelBtn.addEventListener('click', closeTimetableEditForm);
   ttEditSaveBtn.addEventListener('click', () => {
     if (!ttEditingItem) return;
@@ -1339,25 +1388,26 @@
       ttEditText.focus();
       return;
     }
+    const memo = ttEditMemo.value.trim();
     const startMinutes = Number(ttEditStart.value);
     const durationMinutes = Number(ttEditDuration.value);
     if (ttEditingItem.__source === 'daily') {
       saveDailyTemplates(
         loadDailyTemplates().map((t) =>
-          t.id === ttEditingItem.id ? { ...t, text, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : t
+          t.id === ttEditingItem.id ? { ...t, text, memo, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : t
         )
       );
     } else if (ttEditingItem.__source === 'calendar') {
       saveCalendarEvents(
         loadCalendarEvents().map((e) =>
-          e.id === ttEditingItem.id ? { ...e, text, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : e
+          e.id === ttEditingItem.id ? { ...e, text, memo, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : e
         )
       );
     } else {
       saveTodos(
         loadTodos().map((t) =>
           t.id === ttEditingItem.id
-            ? { ...t, text, scheduledDate: ttEditingDateStr, scheduledStart: startMinutes, scheduledMinutes: durationMinutes }
+            ? { ...t, text, memo, scheduledDate: ttEditingDateStr, scheduledStart: startMinutes, scheduledMinutes: durationMinutes }
             : t
         )
       );
