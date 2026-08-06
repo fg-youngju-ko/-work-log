@@ -264,6 +264,18 @@
     resize: vertical;
     margin-bottom: 5px;
   }
+  .leaf-edit-form select.leaf-edit-category {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--card-bg, #fff);
+    color: var(--text);
+    margin-bottom: 5px;
+  }
   .leaf-edit-actions { display: flex; justify-content: flex-end; gap: 5px; }
   .leaf-edit-actions button {
     padding: 3px 9px;
@@ -456,6 +468,18 @@
     color: var(--text);
     margin-bottom: 6px;
   }
+  #ttEditCategory {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--card-bg);
+    color: var(--text);
+    margin-bottom: 6px;
+  }
   .tt-edit-row { display: flex; gap: 6px; margin-bottom: 8px; }
   .tt-edit-row select {
     flex: 1;
@@ -543,6 +567,7 @@
 <div id="ttEditForm" class="tt-edit-form">
   <input type="text" id="ttEditText">
   <textarea id="ttEditMemo" placeholder="상세 메모"></textarea>
+  <select id="ttEditCategory"></select>
   <div class="tt-edit-row">
     <select id="ttEditStart"></select>
     <select id="ttEditDuration"></select>
@@ -609,6 +634,7 @@
   const ttEditForm = document.getElementById('ttEditForm');
   const ttEditText = document.getElementById('ttEditText');
   const ttEditMemo = document.getElementById('ttEditMemo');
+  const ttEditCategory = document.getElementById('ttEditCategory');
   const ttEditStart = document.getElementById('ttEditStart');
   const ttEditDuration = document.getElementById('ttEditDuration');
   const ttEditCancelBtn = document.getElementById('ttEditCancelBtn');
@@ -742,13 +768,13 @@
     render();
   }
 
-  function updateItemContent(item, text, memo) {
+  function updateItemContent(item, text, memo, category) {
     if (item.__source === 'daily') {
-      saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === item.id ? { ...t, text, memo } : t)));
+      saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === item.id ? { ...t, text, memo, category } : t)));
     } else if (item.__source === 'calendar') {
-      saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === item.id ? { ...e, text, memo } : e)));
+      saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === item.id ? { ...e, text, memo, category } : e)));
     } else {
-      saveTodos(loadTodos().map((t) => (t.id === item.id ? { ...t, text, memo } : t)));
+      saveTodos(loadTodos().map((t) => (t.id === item.id ? { ...t, text, memo, category } : t)));
     }
     render();
   }
@@ -841,19 +867,24 @@
     } catch {}
     return [];
   }
-  function populateNewTodoCategorySelect() {
+  function buildCategorySelectOptions(selectEl, selectedValue) {
     const categories = loadCategories();
-    newTodoCategoryInput.innerHTML = '';
+    selectEl.innerHTML = '';
     const noneOpt = document.createElement('option');
     noneOpt.value = '';
     noneOpt.textContent = '미분류';
-    newTodoCategoryInput.appendChild(noneOpt);
+    selectEl.appendChild(noneOpt);
     categories.forEach((c) => {
       const opt = document.createElement('option');
       opt.value = c;
       opt.textContent = c;
-      newTodoCategoryInput.appendChild(opt);
+      selectEl.appendChild(opt);
     });
+    selectEl.value = categories.includes(selectedValue) ? selectedValue : '';
+  }
+
+  function populateNewTodoCategorySelect() {
+    buildCategorySelectOptions(newTodoCategoryInput, '');
   }
 
   function hashName(name) {
@@ -1189,6 +1220,7 @@
     ttEditingDateStr = dateStr;
     ttEditText.value = item.text;
     ttEditMemo.value = item.memo || '';
+    buildCategorySelectOptions(ttEditCategory, item.category || '');
     ttEditForm.classList.add('open');
     ttEditStart.value = String(item.start);
     ttEditDuration.value = String(DURATION_OPTIONS.includes(item.minutes) ? item.minutes : 30);
@@ -1450,25 +1482,38 @@
       return;
     }
     const memo = ttEditMemo.value.trim();
+    const category = ttEditCategory.value;
     const startMinutes = Number(ttEditStart.value);
     const durationMinutes = Number(ttEditDuration.value);
     if (ttEditingItem.__source === 'daily') {
       saveDailyTemplates(
         loadDailyTemplates().map((t) =>
-          t.id === ttEditingItem.id ? { ...t, text, memo, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : t
+          t.id === ttEditingItem.id
+            ? { ...t, text, memo, category, scheduledStart: startMinutes, scheduledMinutes: durationMinutes }
+            : t
         )
       );
     } else if (ttEditingItem.__source === 'calendar') {
       saveCalendarEvents(
         loadCalendarEvents().map((e) =>
-          e.id === ttEditingItem.id ? { ...e, text, memo, scheduledStart: startMinutes, scheduledMinutes: durationMinutes } : e
+          e.id === ttEditingItem.id
+            ? { ...e, text, memo, category, scheduledStart: startMinutes, scheduledMinutes: durationMinutes }
+            : e
         )
       );
     } else {
       saveTodos(
         loadTodos().map((t) =>
           t.id === ttEditingItem.id
-            ? { ...t, text, memo, scheduledDate: ttEditingDateStr, scheduledStart: startMinutes, scheduledMinutes: durationMinutes }
+            ? {
+                ...t,
+                text,
+                memo,
+                category,
+                scheduledDate: ttEditingDateStr,
+                scheduledStart: startMinutes,
+                scheduledMinutes: durationMinutes,
+              }
             : t
         )
       );
@@ -1618,14 +1663,15 @@
         tagsRow.appendChild(tagEl);
         leaf.appendChild(tagsRow);
 
-        // 인라인 수정 폼: 본문/메모를 여기서 바로 고쳐 저장(카테고리는 참고 태그로만
-        // 유지 - 카테고리 자체 관리는 index.html 전담이라는 기존 방침 유지).
+        // 인라인 수정 폼: 본문/메모/카테고리를 여기서 바로 고쳐 저장.
         const editForm = document.createElement('div');
         editForm.className = 'leaf-edit-form hidden';
         const editTextInput = document.createElement('input');
         editTextInput.type = 'text';
         const editMemoTextarea = document.createElement('textarea');
         editMemoTextarea.placeholder = '상세 메모';
+        const editCategorySelect = document.createElement('select');
+        editCategorySelect.className = 'leaf-edit-category';
         const editActions = document.createElement('div');
         editActions.className = 'leaf-edit-actions';
         const editCancelBtn = document.createElement('button');
@@ -1640,12 +1686,14 @@
         editActions.appendChild(editSaveBtn);
         editForm.appendChild(editTextInput);
         editForm.appendChild(editMemoTextarea);
+        editForm.appendChild(editCategorySelect);
         editForm.appendChild(editActions);
         leaf.appendChild(editForm);
 
         editBtn.addEventListener('click', () => {
           editTextInput.value = item.text;
           editMemoTextarea.value = item.memo || '';
+          buildCategorySelectOptions(editCategorySelect, item.category || '');
           editForm.classList.toggle('hidden');
           if (!editForm.classList.contains('hidden')) editTextInput.focus();
         });
@@ -1656,7 +1704,7 @@
             editTextInput.focus();
             return;
           }
-          updateItemContent(item, newText, editMemoTextarea.value.trim());
+          updateItemContent(item, newText, editMemoTextarea.value.trim(), editCategorySelect.value);
         });
 
         leaf.addEventListener('dragstart', (e) => {
