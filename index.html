@@ -1212,16 +1212,23 @@
 
   const CATEGORY_COLOR_MAP_KEY = 'workLog.categoryColors';
 
+  // 카테고리 태그 하나를 그릴 때마다(항목 개수만큼 매 렌더 반복) localStorage를
+  // 다시 읽고 JSON.parse하는 게 누적되면 비용이 커서, 메모리에 캐싱해두고
+  // saveCategoryColorMap()으로 실제 저장할 때만 캐시를 갱신함.
+  let categoryColorMapCache = null;
   function loadCategoryColorMap() {
+    if (categoryColorMapCache) return categoryColorMapCache;
     try {
-      return JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {};
+      categoryColorMapCache = JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {};
     } catch {
-      return {};
+      categoryColorMapCache = {};
     }
+    return categoryColorMapCache;
   }
 
   function saveCategoryColorMap(map) {
     localStorage.setItem(CATEGORY_COLOR_MAP_KEY, JSON.stringify(map));
+    categoryColorMapCache = map;
   }
 
   function setCategoryColorOverride(name, slotIndex) {
@@ -1581,12 +1588,15 @@
     return e.source === 'daily' && !splitEntryContent(e.content).memo;
   }
 
-  function renderSummary() {
+  // entriesData: 이미 로드해둔 entries 배열이 있으면 넘겨서 localStorage 재파싱을
+  // 피할 수 있음(render()에서 한 번만 읽어서 여기 넘겨줌). 없으면(단독 호출 시,
+  // 예: 주간 이동 버튼) 이 함수가 직접 loadEntries()로 읽음.
+  function renderSummary(entriesData) {
     const { start, end } = getWeekRange(summaryViewDate);
     summaryRange.textContent = `${formatDateShort(start)} ~ ${formatDateShort(end)}`;
     summaryDateInput.value = toDatetimeLocalValue(summaryViewDate).slice(0, 10);
 
-    const entries = loadEntries().filter((e) => {
+    const entries = (entriesData || loadEntries()).filter((e) => {
       const t = new Date(e.start).getTime();
       if (t < start.getTime() || t > end.getTime()) return false;
       if (isNoisyDailyEntry(e)) return false;
@@ -1596,11 +1606,11 @@
     renderEntryGroups(summaryBody, entries, '이번 주에 작성된 업무일지가 없습니다.');
   }
 
-  function renderDailySummary() {
+  function renderDailySummary(entriesData) {
     const todayStr = getTodayStr();
     dailySummaryRange.textContent = formatDateShort(new Date());
 
-    const entries = loadEntries().filter((e) => {
+    const entries = (entriesData || loadEntries()).filter((e) => {
       if (e.start.slice(0, 10) !== todayStr) return false;
       if (isNoisyDailyEntry(e)) return false;
       return true;
@@ -2434,7 +2444,13 @@
 
   cancelEditBtn.addEventListener('click', resetForm);
 
-  searchInput.addEventListener('input', render);
+  // 검색어 입력마다 매번 전체 목록을 다시 그리면(특히 항목이 많아질수록) 타이핑
+  // 중 버벅임의 원인이 되므로, 짧은 디바운스로 타이핑이 잠시 멈췄을 때만 렌더.
+  let searchDebounceTimer = null;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(render, 150);
+  });
   searchCategoryInput.addEventListener('change', render);
   searchDateInput.addEventListener('change', render);
   resetSearchBtn.addEventListener('click', () => {
@@ -2505,8 +2521,8 @@
     entryCount.textContent = isFiltering
       ? (entries.length ? `검색결과 ${entries.length}건` : '검색결과 없음')
       : (allEntries.length ? `총 ${allEntries.length}건` : '');
-    renderSummary();
-    renderDailySummary();
+    renderSummary(allEntries);
+    renderDailySummary(allEntries);
 
     if (!entries.length) {
       entryList.innerHTML = `<div class="empty-state">${isFiltering ? '검색 결과가 없습니다.' : '아직 작성된 업무일지가 없습니다.'}</div>`;
@@ -2534,9 +2550,12 @@
       `;
     }).join('');
 
+    // id→entry 맵을 미리 만들어 카드마다 entries.find()로 전체를 다시 훑지 않도록 함
+    // (entries.find를 카드 개수만큼 반복하면 O(n²)이 되어 항목이 늘어날수록 급격히 느려짐).
+    const entryById = new Map(entries.map((e) => [e.id, e]));
     entryList.querySelectorAll('.entry-card').forEach((card) => {
       const id = card.getAttribute('data-id');
-      const entry = entries.find((e) => e.id === id);
+      const entry = entryById.get(id);
       card.querySelector('.entry-content').textContent = entry.content;
       const entryTag = card.querySelector('.category-tag');
       entryTag.textContent = entry.category || '미분류';

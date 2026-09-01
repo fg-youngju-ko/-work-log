@@ -849,12 +849,22 @@
   function saveProjects(projects) {
     localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
   }
+  // 리프(항목)마다 매 렌더 반복해서 localStorage를 다시 읽고 JSON.parse하는 비용을
+  // 피하려고 메모리에 캐싱 - 실제 저장(save*)할 때만 캐시를 갱신함(index.html의
+  // 동일 패턴과 동일한 이유).
+  let projectColorMapCache = null;
   function loadProjectColorMap() {
-    try { return JSON.parse(localStorage.getItem(PROJECT_COLOR_MAP_KEY)) || {}; } catch { return {}; }
+    if (projectColorMapCache) return projectColorMapCache;
+    try { projectColorMapCache = JSON.parse(localStorage.getItem(PROJECT_COLOR_MAP_KEY)) || {}; } catch { projectColorMapCache = {}; }
+    return projectColorMapCache;
   }
   function saveProjectColorMap(map) {
     localStorage.setItem(PROJECT_COLOR_MAP_KEY, JSON.stringify(map));
+    projectColorMapCache = map;
   }
+  // 카테고리 색상은 index.html에서만 저장(쓰기)하고 여기선 읽기 전용이라 캐싱하지
+  // 않음 — 두 페이지를 동시에 탭으로 열어두는 사용 방식이라 index.html에서 방금
+  // 바꾼 색이 여기서도 바로 반영돼야 함(캐싱하면 새로고침 전까진 옛 색이 보임).
   function loadCategoryColorMap() {
     try { return JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {}; } catch { return {}; }
   }
