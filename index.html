@@ -1212,6 +1212,29 @@
 
   const CATEGORY_COLOR_MAP_KEY = 'workLog.categoryColors';
 
+  // 업무대제목(project)은 mindmap.html 전담 데이터라 여기선 관리 UI는 없지만,
+  // 같은 localStorage를 공유하므로 백업 내보내기/가져오기에는 포함시켜야
+  // 마인드맵에서 만든 대제목/색이 백업에서 누락되지 않는다.
+  const PROJECT_STORAGE_KEY = 'workLog.projects';
+  const PROJECT_COLOR_MAP_KEY = 'workLog.projectColors';
+
+  function loadProjects() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY));
+      return Array.isArray(stored) ? stored : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function loadProjectColorMap() {
+    try {
+      return JSON.parse(localStorage.getItem(PROJECT_COLOR_MAP_KEY)) || {};
+    } catch {
+      return {};
+    }
+  }
+
   // 카테고리 태그 하나를 그릴 때마다(항목 개수만큼 매 렌더 반복) localStorage를
   // 다시 읽고 JSON.parse하는 게 누적되면 비용이 커서, 메모리에 캐싱해두고
   // saveCategoryColorMap()으로 실제 저장할 때만 캐시를 갱신함.
@@ -2573,7 +2596,7 @@
     showIoStatus._timer = setTimeout(() => { ioStatus.textContent = ''; }, 4000);
   }
 
-  exportBtn.addEventListener('click', () => {
+  function downloadBackup() {
     const data = {
       entries: loadEntries(),
       todos: loadTodos(),
@@ -2582,6 +2605,8 @@
       dailyTemplates: loadDailyTemplates(),
       dailyCompletions: loadDailyCompletions(),
       calendarEvents: loadCalendarEvents(),
+      projects: loadProjects(),
+      projectColors: loadProjectColorMap(),
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -2591,8 +2616,32 @@
     a.download = `업무일지_백업_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  exportBtn.addEventListener('click', () => {
+    downloadBackup();
     showIoStatus('백업 다운로드 완료');
   });
+
+  // ---- 매일 오전 자동 백업 ----
+  // "컴퓨터가 켜져있고 작업일지가 사용중이라면" = 이 탭이 열려있는 동안에만
+  // 동작(별도 백그라운드 프로세스 없음). 오전(자정~정오 전)에 이 페이지가 열려
+  // 있으면(새로 열거나, 밤새 켜둔 채로 자정을 넘겨도) 하루 한 번만 자동으로
+  // 내보내기와 동일한 백업 파일을 다운로드한다.
+  const AUTO_BACKUP_DATE_KEY = 'workLog.lastAutoBackupDate';
+
+  function maybeAutoBackup() {
+    const now = new Date();
+    if (now.getHours() >= 12) return; // 오전이 아니면 대기
+    const todayStr = getTodayStr();
+    if (localStorage.getItem(AUTO_BACKUP_DATE_KEY) === todayStr) return; // 오늘 이미 완료
+    downloadBackup();
+    localStorage.setItem(AUTO_BACKUP_DATE_KEY, todayStr);
+    showIoStatus('🔄 오늘의 자동 백업이 저장되었습니다');
+  }
+
+  maybeAutoBackup();
+  setInterval(maybeAutoBackup, 15 * 60 * 1000); // 자정을 넘겨 계속 켜둔 경우 대비, 15분마다 재확인
 
   importBtn.addEventListener('click', () => importFile.click());
 
@@ -2641,6 +2690,12 @@
           const existing = loadCalendarEvents();
           const existingIds = new Set(existing.map((e) => e.id));
           saveCalendarEvents([...existing, ...data.calendarEvents.filter((e) => !existingIds.has(e.id))]);
+        }
+        if (Array.isArray(data.projects) && data.projects.length) {
+          localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(Array.from(new Set([...loadProjects(), ...data.projects]))));
+        }
+        if (data.projectColors && typeof data.projectColors === 'object') {
+          localStorage.setItem(PROJECT_COLOR_MAP_KEY, JSON.stringify({ ...loadProjectColorMap(), ...data.projectColors }));
         }
 
         renderCategorySelect();
