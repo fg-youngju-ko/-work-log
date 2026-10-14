@@ -162,6 +162,9 @@
     background: var(--border);
     color: var(--text);
   }
+  .branch-header[draggable="true"] { cursor: grab; }
+  .branch.branch-dragging { opacity: 0.4; }
+  .branch-header.branch-drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
   .branch-title { word-break: break-word; }
   .branch-actions { display: flex; gap: 2px; flex-shrink: 0; }
   .branch-actions button {
@@ -1595,6 +1598,43 @@
         headerEl.appendChild(actions);
       }
       branchEl.appendChild(headerEl);
+
+      // 대제목(브랜치) 순서를 헤더를 클릭한 채 드래그해서 바꿀 수 있게 함.
+      // 리프 드래그는 'todo:'/'daily:'/'cal:' 접두사의 __key를 쓰고 branch-leaves
+      // 영역에서만 처리되므로, 여기선 'branch:' 접두사로 구분해 서로 간섭하지 않음.
+      // "자동 생성"은 실제 프로젝트가 아니라 항상 끝에 고정되므로 드래그 대상에서 제외.
+      if (!isUnassigned) {
+        headerEl.draggable = true;
+        headerEl.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', 'branch:' + name);
+          e.dataTransfer.effectAllowed = 'move';
+          branchEl.classList.add('branch-dragging');
+        });
+        headerEl.addEventListener('dragend', () => {
+          branchEl.classList.remove('branch-dragging');
+        });
+        headerEl.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          headerEl.classList.add('branch-drag-over');
+        });
+        headerEl.addEventListener('dragleave', () => headerEl.classList.remove('branch-drag-over'));
+        headerEl.addEventListener('drop', (e) => {
+          e.preventDefault();
+          headerEl.classList.remove('branch-drag-over');
+          const raw = e.dataTransfer.getData('text/plain');
+          if (!raw.startsWith('branch:')) return;
+          const draggedName = raw.slice('branch:'.length);
+          if (draggedName === name) return;
+          const order = loadProjects();
+          const fromIdx = order.indexOf(draggedName);
+          if (fromIdx === -1) return;
+          order.splice(fromIdx, 1);
+          const toIdx = order.indexOf(name);
+          order.splice(toIdx === -1 ? order.length : toIdx, 0, draggedName);
+          saveProjects(order);
+          render();
+        });
+      }
 
       const leavesEl = document.createElement('div');
       leavesEl.className = 'branch-leaves';
