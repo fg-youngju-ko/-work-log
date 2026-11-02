@@ -232,6 +232,15 @@
       <input type="time" id="inOtEnd">
     </div>
 
+    <div id="breakSkipRow" class="hidden" style="display:flex;gap:14px;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:5px;font-size:11.5px">
+        <input type="checkbox" id="inSkipLunch"> 점심(12:00~13:00) 안 쉬었음
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:11.5px">
+        <input type="checkbox" id="inSkipDinner"> 저녁(17:30~18:00) 안 쉬었음
+      </label>
+    </div>
+
     <div id="exclSection" class="hidden">
       <label style="font-size:11px;color:var(--text-muted);font-weight:700;display:block;margin-bottom:6px">지각 · 조퇴 · 외출 · 휴게 (겹쳐도 중복 차감 안 됨)</label>
       <div id="exclList"></div>
@@ -430,8 +439,9 @@
       return h;
     }
     if (rec.clockIn && rec.clockOut) {
-      const mins = WorkLog.LaborEngine.getDayActualMinutes(rec);
-      if (mins > currentSettings().dailyScheduledMinutes) return `<div class="dh ot">${(mins / 60).toFixed(1)}h</div>`;
+      const settings = currentSettings();
+      const mins = WorkLog.LaborEngine.getDayActualMinutes(rec, settings);
+      if (mins > settings.dailyScheduledMinutes) return `<div class="dh ot">${(mins / 60).toFixed(1)}h</div>`;
       return `<div class="dh">${(mins / 60).toFixed(1)}h</div>`;
     }
     return '';
@@ -583,6 +593,7 @@
     document.getElementById('halfFields').classList.toggle('hidden', t !== 'half');
     document.getElementById('quarterFields').classList.toggle('hidden', t !== 'quarter');
     document.getElementById('exclSection').classList.toggle('hidden', t === 'absent' || t === 'annual');
+    document.getElementById('breakSkipRow').classList.toggle('hidden', t === 'absent' || t === 'annual');
     updateOtRowVisibility();
   }
   function updateOtRowVisibility() {
@@ -669,6 +680,8 @@
     document.getElementById('inHolClockOut').value = (rec && rec.clockOut) || '17:30';
     document.getElementById('inOtEnd').value = '';
     document.getElementById('inMemo').value = (rec && rec.memo) || '';
+    document.getElementById('inSkipLunch').checked = !!(rec && rec.skipLunch);
+    document.getElementById('inSkipDinner').checked = !!(rec && rec.skipDinner);
 
     if (rec && (rec.excluded || []).length) rec.excluded.forEach((e) => addExclRow(e));
 
@@ -686,16 +699,18 @@
   document.getElementById('daySaveBtn').addEventListener('click', () => {
     if (!editingDate) return;
     const memo = document.getElementById('inMemo').value.trim();
+    const skipLunch = document.getElementById('inSkipLunch').checked;
+    const skipDinner = document.getElementById('inSkipDinner').checked;
     let detail = null;
 
     if (modalType === 'absent') {
-      detail = { dayType: 'absent', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, memo };
+      detail = { dayType: 'absent', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, skipLunch: false, skipDinner: false, memo };
     } else if (modalType === 'annual') {
-      detail = { dayType: 'leave', leaveHours: 8, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, memo };
+      detail = { dayType: 'leave', leaveHours: 8, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, skipLunch: false, skipDinner: false, memo };
     } else if (modalType === 'half') {
       const h = HALF_TIMES[halfChoice];
       const otEnd = document.getElementById('inOtEnd').value;
-      detail = { dayType: 'leave', leaveHours: 4, clockIn: h.clockIn, clockOut: (h.otAllowed && otEnd) ? otEnd : h.clockOut, excluded: readExclRows(), holidayWorked: false, memo, halfChoice };
+      detail = { dayType: 'leave', leaveHours: 4, clockIn: h.clockIn, clockOut: (h.otAllowed && otEnd) ? otEnd : h.clockOut, excluded: readExclRows(), holidayWorked: false, skipLunch, skipDinner, memo, halfChoice };
     } else if (modalType === 'quarter') {
       const q = QUARTER_TIMES[quarterChoice];
       const otEnd = document.getElementById('inOtEnd').value;
@@ -706,21 +721,21 @@
         clockIn = q.clockIn; clockOut = (q.otAllowed && otEnd) ? otEnd : q.clockOut2;
         excluded.push({ kind: 'break', start: q.clockOut, end: q.clockIn2, paid: true });
       }
-      detail = { dayType: 'leave', leaveHours: 2, clockIn, clockOut, excluded, holidayWorked: false, memo, quarterChoice };
+      detail = { dayType: 'leave', leaveHours: 2, clockIn, clockOut, excluded, holidayWorked: false, skipLunch, skipDinner, memo, quarterChoice };
     } else if (modalType === 'holiday') {
       const worked = document.getElementById('inHolidayWorked').checked;
       detail = {
         dayType: 'holiday', leaveHours: 0,
         clockIn: worked ? document.getElementById('inHolClockIn').value : null,
         clockOut: worked ? document.getElementById('inHolClockOut').value : null,
-        excluded: worked ? readExclRows() : [], holidayWorked: worked, memo,
+        excluded: worked ? readExclRows() : [], holidayWorked: worked, skipLunch, skipDinner, memo,
       };
     } else {
       detail = {
         dayType: 'work', leaveHours: 0,
         clockIn: document.getElementById('inClockIn').value,
         clockOut: document.getElementById('inClockOut').value,
-        excluded: readExclRows(), holidayWorked: false, memo,
+        excluded: readExclRows(), holidayWorked: false, skipLunch, skipDinner, memo,
       };
     }
 
@@ -837,18 +852,17 @@
       const statusEl = document.getElementById('legacyImportStatus');
       try {
         const old = JSON.parse(reader.result);
-        let converted = 0, skippedExisting = 0, skippedNoData = 0, approximate = 0;
+        let converted = 0, skippedExisting = 0, skippedNoData = 0;
         const keys = Object.keys(old).filter((k) => k !== '__weekly__' && /^\d{4}-\d{2}-\d{2}$/.test(k));
         for (const dateStr of keys) {
           if (laborRecords[dateStr]) { skippedExisting++; continue; }
           const dow = new Date(dateStr + 'T00:00:00').getDay();
           const result = WorkLog.LaborEngine.convertLegacyRecord(old[dateStr], dow);
           if (!result) { skippedNoData++; continue; }
-          if (result.approximate) approximate++;
           saveDayRecord(dateStr, result.detail);
           converted++;
         }
-        statusEl.textContent = `변환 ${converted}건(근사 ${approximate}건) · 기존 유지 ${skippedExisting}건 · 확인 필요로 남김 ${skippedNoData}건`;
+        statusEl.textContent = `변환 ${converted}건 · 기존 유지 ${skippedExisting}건 · 확인 필요로 남김 ${skippedNoData}건`;
         renderAll();
       } catch (err) {
         statusEl.textContent = '가져오기 실패: JSON 파일을 확인해주세요';

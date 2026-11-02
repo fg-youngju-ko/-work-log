@@ -64,6 +64,14 @@
     dailyScheduledMinutes: 480,
     weeklyScheduledMinutes: 2400, // 40시간
     payPeriodStartDay: 1, // 급여 집계기간 시작일(1=매월 1일 ~ 말일)
+    // 점심(고정 1시간)·저녁(17:30~18:00 고정 30분) 휴게 - 근로기준법 제54조상
+    // 의무 휴게라 "추측"이 아니라 "정해진 규칙"으로 보고, 근무 구간이 이 시간대를
+    // 지나가면 사용자가 매번 입력하지 않아도 자동으로 제외한다. 실제로 쉬지
+    // 않고 계속 근무했다면 레코드별 skipLunch/skipDinner로 끈다.
+    lunchStart: '12:00',
+    lunchEnd: '13:00',
+    dinnerStart: '17:30',
+    dinnerEnd: '18:00',
   };
 
   function mergeSettings(s) {
@@ -108,16 +116,25 @@
     return Array.from({ length: 7 }, (_, i) => addDays(mondayStr, i));
   }
 
-  const EMPTY_RECORD = Object.freeze({ dayType: 'work', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, memo: '' });
+  const EMPTY_RECORD = Object.freeze({ dayType: 'work', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, skipLunch: false, skipDinner: false, memo: '' });
 
   function getRecord(records, dateStr) {
     return records[dateStr] || EMPTY_RECORD;
   }
 
+  function fixedWindowMinutes(startStr, endStr) {
+    const s = parseHM(startStr), e = parseHM(endStr);
+    if (s === null || e === null || e <= s) return null;
+    return [s, e];
+  }
+
   // 하루의 "실제 근로 구간"(병합된 [시작,종료] 리스트, 분 단위, 자정을 넘는
-  // 야근은 clockOut에 1440을 더해 표현). 지각·조퇴·외출·휴게는 paid 여부와
-  // 무관하게 전부 "근로 아님"으로 빼되, 서로 겹쳐도 한 번만 뺀다.
-  function getWorkIntervals(record) {
+  // 야근은 clockOut에 1440을 더해 표현). 지각·조퇴·외출·사용자가 직접 입력한
+  // 휴게는 paid 여부와 무관하게 전부 "근로 아님"으로 빼되, 서로 겹쳐도 한 번만
+  // 뺀다. 점심(기본 12:00~13:00)·저녁(17:30~18:00)은 근로기준법상 의무 휴게라
+  // 근무 구간이 그 시간대를 지나가면 매번 입력하지 않아도 자동으로 같이 뺀다
+  // (레코드의 skipLunch/skipDinner로 끌 수 있음 - 실제로 못 쉰 경우).
+  function getWorkIntervals(record, rawSettings) {
     if (!record || record.dayType === 'absent') return [];
     if (record.dayType === 'leave' && !record.clockIn) return [];
     if (record.dayType === 'holiday' && !record.holidayWorked) return [];
@@ -125,16 +142,27 @@
     let outM = parseHM(record.clockOut);
     if (inM === null || outM === null) return [];
     if (outM <= inM) outM += MIN_PER_DAY; // 자정 넘어가는 근무
-    const excluded = mergeIntervals((record.excluded || []).map((e) => {
+
+    const settings = rawSettings ? mergeSettings(rawSettings) : DEFAULT_SETTINGS;
+    const excludedList = (record.excluded || []).map((e) => {
       let s = parseHM(e.start), eMin = parseHM(e.end);
       if (s === null || eMin === null) return [0, 0];
       if (eMin <= s) eMin += MIN_PER_DAY;
       return [s, eMin];
-    }));
+    });
+    if (!record.skipLunch) {
+      const w = fixedWindowMinutes(settings.lunchStart, settings.lunchEnd);
+      if (w) excludedList.push(w);
+    }
+    if (!record.skipDinner) {
+      const w = fixedWindowMinutes(settings.dinnerStart, settings.dinnerEnd);
+      if (w) excludedList.push(w);
+    }
+    const excluded = mergeIntervals(excludedList);
     return subtractIntervals([[inM, outM]], excluded);
   }
-  function getDayActualMinutes(record) {
-    return sumIntervals(getWorkIntervals(record));
+  function getDayActualMinutes(record, settings) {
+    return sumIntervals(getWorkIntervals(record, settings));
   }
   // 유급이지만 "근로"는 아닌 시간(연차/반차/반반차 유급휴가 + 유급 외출 등).
   function getDayPaidNonWorkMinutes(record) {
@@ -165,7 +193,7 @@
 
     dates.forEach((dateStr) => {
       const rec = getRecord(records, dateStr);
-      const intervals = getWorkIntervals(rec);
+      const intervals = getWorkIntervals(rec, settings);
       const actualMinutes = sumIntervals(intervals);
       const night = nightMinutesOf(intervals);
       const paidNonWork = getDayPaidNonWorkMinutes(rec);
@@ -385,37 +413,23 @@
   }
 
   // 구 work52_manager(workhours_v4) 레코드를 새 labor.html 스키마로 변환.
-  // 옛 모델은 "휴게를 몇 분 뺄지"만 알고 "언제" 뺐는지는 기록하지 않았으므로,
-  // 구간 한가운데에 그 분량만큼의 excluded를 임의로 배치해 총량만 보존한다
-  // (실제 위치는 알 수 없어 근사치임 - 야간 가산처럼 "위치"가 중요한 계산에는
-  // 영향 줄 수 있어 변환 결과를 확인 필요로 같이 안내해야 함).
+  // 옛 모델이 가정했던 점심/저녁 휴게는 이제 새 엔진이 고정 시간대(기본
+  // 12:00~13:00, 17:30~18:00)로 자동 적용하므로, 여기서는 excluded를 직접
+  // 만들지 않고 clockIn/clockOut/skipDinner만 넘겨주면 된다(두 동작이 결과적으로
+  // 일치: 옛 파일도 "17:30 이후 일하면 저녁 30분"을 썼고, 기본 8h 가정도
+  // 08:30~17:30 안에 점심 1h가 포함된 것과 같음).
   // 반환: {detail, approximate} 또는 완전히 빈 레코드면 null.
   function convertLegacyRecord(oldRec, dow) {
     if (!oldRec || typeof oldRec !== 'object') return null;
     const memo = oldRec.memo || '';
-    let approximate = false;
-
-    function breakExcluded(startMin, rawSpanMin, endMin, skipDinner) {
-      const excluded = [];
-      let brk = 0;
-      if (rawSpanMin > 8 * 60) brk = 60;
-      else if (rawSpanMin > 4 * 60) brk = 30;
-      if (brk > 0) {
-        const mid = startMin + Math.floor(rawSpanMin / 2) - Math.floor(brk / 2);
-        excluded.push({ kind: 'break', start: fmtHM(mid), end: fmtHM(mid + brk), paid: false });
-        approximate = true;
-      }
-      if (endMin >= 18 * 60 && !skipDinner) {
-        excluded.push({ kind: 'break', start: '18:00', end: '18:30', paid: false });
-      }
-      return excluded;
-    }
+    const approximate = false;
+    const skipDinner = !!oldRec.skipDinner;
 
     if (oldRec.type === 'annual') {
-      return { detail: { dayType: 'leave', leaveHours: 8, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, memo }, approximate };
+      return { detail: { dayType: 'leave', leaveHours: 8, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, skipLunch: false, skipDinner: false, memo }, approximate };
     }
     if (oldRec.type === 'absent') {
-      return { detail: { dayType: 'absent', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, memo }, approximate };
+      return { detail: { dayType: 'absent', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, skipLunch: false, skipDinner: false, memo }, approximate };
     }
     if (oldRec.type === 'half') {
       const am = oldRec.halfTime !== 'PM';
@@ -424,35 +438,32 @@
         const ot = parseHM(oldRec.ot);
         if (ot !== null && ot > 17 * 60 + 30) clockOut = fmtHM(ot);
       }
-      const excluded = [];
-      if (clockOut !== (am ? '17:30' : '12:30') && parseHM(clockOut) >= 18 * 60 && !oldRec.skipDinner) {
-        excluded.push({ kind: 'break', start: '18:00', end: '18:30', paid: false });
-      }
-      return { detail: { dayType: 'leave', leaveHours: 4, clockIn, clockOut, excluded, holidayWorked: false, memo }, approximate };
+      // 반차 근무 구간(오전 13:30~17:30 또는 오후 08:30~12:30)엔 점심시간이 없음
+      return { detail: { dayType: 'leave', leaveHours: 4, clockIn, clockOut, excluded: [], holidayWorked: false, skipLunch: true, skipDinner, memo }, approximate };
     }
     if (oldRec.type === 'quarter') {
       const qt = oldRec.quarterTime || 'AM1';
-      let clockIn, clockOut, excluded = [];
+      let clockIn, clockOut, excluded = [], skipLunch = true;
       if (qt === 'AM1') { clockIn = '10:30'; clockOut = '17:30'; }
       else if (qt === 'PM1') { clockIn = '08:30'; clockOut = '13:30'; }
       else if (qt === 'PM2') { clockIn = '08:30'; clockOut = '15:30'; }
-      else { clockIn = '08:30'; clockOut = '17:30'; excluded.push({ kind: 'break', start: '10:30', end: '12:30', paid: true }); } // AM2
+      else { clockIn = '08:30'; clockOut = '17:30'; skipLunch = false; } // AM2: 08:30~17:30 전체 구간에 점심(12~13시)이 포함되므로 자동 적용되게 둠, 10:30~12:30 유급구간만 추가로 제외
+      if (qt === 'AM2') excluded.push({ kind: 'break', start: '10:30', end: '12:30', paid: true });
       if ((qt === 'AM1' || qt === 'AM2') && oldRec.ot) {
         const ot = parseHM(oldRec.ot);
         if (ot !== null && ot > 17 * 60 + 30) clockOut = fmtHM(ot);
       }
-      if (parseHM(clockOut) >= 18 * 60 && !oldRec.skipDinner) excluded.push({ kind: 'break', start: '18:00', end: '18:30', paid: false });
-      return { detail: { dayType: 'leave', leaveHours: 2, clockIn, clockOut, excluded, holidayWorked: false, memo }, approximate };
+      return { detail: { dayType: 'leave', leaveHours: 2, clockIn, clockOut, excluded, holidayWorked: false, skipLunch, skipDinner, memo }, approximate };
     }
     if (oldRec.type === 'holiday') {
       if (!oldRec.special) {
-        return { detail: { dayType: 'holiday', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, memo }, approximate };
+        return { detail: { dayType: 'holiday', leaveHours: 0, clockIn: null, clockOut: null, excluded: [], holidayWorked: false, skipLunch: false, skipDinner: false, memo }, approximate };
       }
       const pts = oldRec.special.split('~').map((x) => x.trim());
       const s = parseHM(pts[0]), e = parseHM(pts[1]);
       if (s === null || e === null || e <= s) return null;
       return {
-        detail: { dayType: 'holiday', leaveHours: 0, clockIn: fmtHM(s), clockOut: fmtHM(e), excluded: breakExcluded(s, e - s, e, oldRec.skipDinner), holidayWorked: true, memo },
+        detail: { dayType: 'holiday', leaveHours: 0, clockIn: fmtHM(s), clockOut: fmtHM(e), excluded: [], holidayWorked: true, skipLunch: false, skipDinner, memo },
         approximate,
       };
     }
@@ -463,7 +474,7 @@
       const s = parseHM(pts[0]), e = parseHM(pts[1]);
       if (s === null || e === null || e <= s) return null;
       return {
-        detail: { dayType: 'work', leaveHours: 0, clockIn: fmtHM(s), clockOut: fmtHM(e), excluded: breakExcluded(s, e - s, e, oldRec.skipDinner), holidayWorked: false, memo },
+        detail: { dayType: 'work', leaveHours: 0, clockIn: fmtHM(s), clockOut: fmtHM(e), excluded: [], holidayWorked: false, skipLunch: false, skipDinner, memo },
         approximate,
       };
     }
@@ -473,9 +484,7 @@
     if (oldRec.ot) {
       const ot = parseHM(oldRec.ot);
       if (ot === null || ot <= 17 * 60 + 30) return null;
-      const excluded = [];
-      if (ot >= 18 * 60 && !oldRec.skipDinner) excluded.push({ kind: 'break', start: '18:00', end: '18:30', paid: false });
-      return { detail: { dayType: 'work', leaveHours: 0, clockIn: '08:30', clockOut: fmtHM(ot), excluded, holidayWorked: false, memo }, approximate };
+      return { detail: { dayType: 'work', leaveHours: 0, clockIn: '08:30', clockOut: fmtHM(ot), excluded: [], holidayWorked: false, skipLunch: false, skipDinner, memo }, approximate };
     }
     return null; // memo만 있는 평일 등 - 출퇴근을 확정할 수 없어 변환 안 함(확인 필요로 남김)
   }
