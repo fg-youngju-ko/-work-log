@@ -45,6 +45,50 @@
   }
   * { box-sizing: border-box; }
   .hidden { display: none !important; }
+  .pin-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .pin-overlay.hidden { display: none !important; }
+  .pin-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 28px 32px;
+    text-align: center;
+    width: 240px;
+  }
+  .pin-box h2 { margin: 0 0 14px; font-size: 16px; }
+  .pin-box input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 20px;
+    letter-spacing: 8px;
+    text-align: center;
+    background: transparent;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .pin-box button {
+    width: 100%;
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    border-radius: 8px;
+    padding: 9px;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .pin-error { color: #e5484d; font-size: 12px; margin-top: 10px; min-height: 14px; }
   body {
     margin: 0;
     font-family: -apple-system, "Segoe UI", "Pretendard", "Malgun Gothic", sans-serif;
@@ -510,6 +554,14 @@
 </style>
 </head>
 <body>
+<div id="pinOverlay" class="pin-overlay">
+  <div class="pin-box">
+    <h2>🔒 PIN 입력</h2>
+    <input type="password" id="pinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="····">
+    <button type="button" id="pinSubmitBtn">확인</button>
+    <div class="pin-error" id="pinError"></div>
+  </div>
+</div>
 <div class="app">
 <div class="left-col">
   <header>
@@ -626,6 +678,11 @@
   const branchRow = document.getElementById('branchRow');
   const floatingMemoPopup = document.getElementById('floatingMemoPopup');
 
+  const pinOverlay = document.getElementById('pinOverlay');
+  const pinInput = document.getElementById('pinInput');
+  const pinSubmitBtn = document.getElementById('pinSubmitBtn');
+  const pinError = document.getElementById('pinError');
+
   const ttPrevBtn = document.getElementById('ttPrevBtn');
   const ttNextBtn = document.getElementById('ttNextBtn');
   const ttTodayBtn = document.getElementById('ttTodayBtn');
@@ -667,35 +724,106 @@
     floatingMemoPopup.style.display = 'none';
   }
 
+  // ---- 서버(Cloudflare D1) 연동 ----
+  // index.html과 동일한 패턴(상세 설명은 index.html 주석 참고): entries는 완료
+  // 체크 시 1건만 생성하고 이 페이지에서는 다시 읽지 않으므로(목록 표시 안 함)
+  // 캐시를 서버에서 미리 불러올 필요 없이 빈 배열에서 시작해도 diff 결과가 항상
+  // 올바르다. todos/daily/calendar/projects/categories는 이 페이지에서도 직접
+  // 읽고 쓰므로 kv 캐시를 페이지 로드 시 반드시 불러와야 한다.
+  const API_BASE = '/api';
+  const PIN_KEY = 'workLog.pin';
+
+  function getStoredPin() {
+    return localStorage.getItem(PIN_KEY) || '';
+  }
+  function setStoredPin(pin) {
+    if (pin) localStorage.setItem(PIN_KEY, pin);
+    else localStorage.removeItem(PIN_KEY);
+  }
+
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(API_BASE + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + getStoredPin(), ...(opts.headers || {}) },
+    });
+    if (res.status === 401) {
+      setStoredPin('');
+      const err = new Error('PIN이 필요합니다');
+      err.code = 'PIN_REQUIRED';
+      throw err;
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `요청 실패(${res.status})`);
+    }
+    return res.status === 204 ? null : res.json();
+  }
+
+  function onSyncError(err) {
+    if (err && err.code === 'PIN_REQUIRED') {
+      showPinOverlay('PIN이 바뀐 것 같아요. index.html에서 다시 입력해주세요.');
+    }
+    // 그 외 네트워크 오류는 이 페이지엔 별도 토스트가 없어 조용히 무시(다음 동작에서 재시도됨)
+  }
+
+  let entriesCache = [];
+  let kvCache = {};
+
+  async function refreshKvFromServer() {
+    kvCache = (await apiFetch('/kv')) || {};
+  }
+
+  function kvGet(key) {
+    return kvCache[key];
+  }
+  function kvSet(key, value) {
+    kvCache[key] = value;
+    apiFetch('/kv/' + encodeURIComponent(key), { method: 'PUT', body: JSON.stringify(value) }).catch(onSyncError);
+  }
+
+  function diffAndSyncEntries(newEntries) {
+    const oldById = new Map(entriesCache.map((e) => [e.id, e]));
+    const newById = new Map(newEntries.map((e) => [e.id, e]));
+    entriesCache = newEntries;
+    newById.forEach((entry, id) => {
+      if (!oldById.has(id)) {
+        apiFetch('/entries', { method: 'POST', body: JSON.stringify(entry) }).catch(onSyncError);
+      }
+    });
+  }
+
   function loadEntries() {
-    try { return JSON.parse(localStorage.getItem(ENTRY_STORAGE_KEY)) || []; } catch { return []; }
+    // completeItem()이 "const entries = loadEntries(); entries.push(entry); saveEntries(entries);"
+    // 패턴을 쓰므로, 캐시 원본을 그대로 주면 push가 entriesCache를 먼저 바꿔버려서
+    // diffAndSyncEntries가 "변경 없음"으로 오판한다. 매번 복사본을 돌려줘야 한다.
+    return entriesCache.slice();
   }
   function saveEntries(entries) {
-    localStorage.setItem(ENTRY_STORAGE_KEY, JSON.stringify(entries));
+    diffAndSyncEntries(entries);
   }
   function loadTodos() {
-    try { return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY)) || []; } catch { return []; }
+    return kvGet(TODO_STORAGE_KEY) || [];
   }
   function saveTodos(todos) {
-    localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+    kvSet(TODO_STORAGE_KEY, todos);
   }
   function loadDailyTemplates() {
-    try { return JSON.parse(localStorage.getItem(DAILY_STORAGE_KEY)) || []; } catch { return []; }
+    return kvGet(DAILY_STORAGE_KEY) || [];
   }
   function saveDailyTemplates(templates) {
-    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(templates));
+    kvSet(DAILY_STORAGE_KEY, templates);
   }
   function loadDailyCompletions() {
-    try { return JSON.parse(localStorage.getItem(DAILY_COMPLETIONS_KEY)) || []; } catch { return []; }
+    return kvGet(DAILY_COMPLETIONS_KEY) || [];
   }
   function saveDailyCompletions(completions) {
-    localStorage.setItem(DAILY_COMPLETIONS_KEY, JSON.stringify(completions));
+    kvSet(DAILY_COMPLETIONS_KEY, completions);
   }
   function loadCalendarEvents() {
-    try { return JSON.parse(localStorage.getItem(CALENDAR_STORAGE_KEY)) || []; } catch { return []; }
+    return kvGet(CALENDAR_STORAGE_KEY) || [];
   }
   function saveCalendarEvents(events) {
-    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(events));
+    kvSet(CALENDAR_STORAGE_KEY, events);
   }
 
   function getTodayStr() {
@@ -847,38 +975,26 @@
     render();
   }
   function loadProjects() {
-    try { return JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY)) || []; } catch { return []; }
+    return kvGet(PROJECT_STORAGE_KEY) || [];
   }
   function saveProjects(projects) {
-    localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+    kvSet(PROJECT_STORAGE_KEY, projects);
   }
-  // 리프(항목)마다 매 렌더 반복해서 localStorage를 다시 읽고 JSON.parse하는 비용을
-  // 피하려고 메모리에 캐싱 - 실제 저장(save*)할 때만 캐시를 갱신함(index.html의
-  // 동일 패턴과 동일한 이유).
-  let projectColorMapCache = null;
   function loadProjectColorMap() {
-    if (projectColorMapCache) return projectColorMapCache;
-    try { projectColorMapCache = JSON.parse(localStorage.getItem(PROJECT_COLOR_MAP_KEY)) || {}; } catch { projectColorMapCache = {}; }
-    return projectColorMapCache;
+    return kvGet(PROJECT_COLOR_MAP_KEY) || {};
   }
   function saveProjectColorMap(map) {
-    localStorage.setItem(PROJECT_COLOR_MAP_KEY, JSON.stringify(map));
-    projectColorMapCache = map;
+    kvSet(PROJECT_COLOR_MAP_KEY, map);
   }
-  // 카테고리 색상은 index.html에서만 저장(쓰기)하고 여기선 읽기 전용이라 캐싱하지
-  // 않음 — 두 페이지를 동시에 탭으로 열어두는 사용 방식이라 index.html에서 방금
-  // 바꾼 색이 여기서도 바로 반영돼야 함(캐싱하면 새로고침 전까진 옛 색이 보임).
+  // 카테고리 자체(목록/색)의 추가/수정/삭제는 index.html에서만 관리, 여기선 읽기 전용.
+  // 두 페이지 다 페이지 로드 시 서버에서 kv를 통째로 한 번 불러오므로, index.html에서
+  // 바꾼 뒤 이 페이지를 새로고침하면 바로 반영된다(주기적 polling도 함께 돌림).
   function loadCategoryColorMap() {
-    try { return JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {}; } catch { return {}; }
+    return kvGet(CATEGORY_COLOR_MAP_KEY) || {};
   }
-  // 카테고리 자체의 추가/수정/삭제는 index.html에서만 관리 - 여기서는 새 할 일
-  // 작성 시 고를 수 있도록 목록만 읽어온다(없으면 빈 배열, 기본값을 만들어 쓰지 않음).
   function loadCategories() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
-      if (Array.isArray(stored)) return stored;
-    } catch {}
-    return [];
+    const stored = kvGet(CATEGORY_STORAGE_KEY);
+    return Array.isArray(stored) ? stored : [];
   }
   function buildCategorySelectOptions(selectEl, selectedValue) {
     const categories = loadCategories();
@@ -1800,9 +1916,80 @@
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   }
 
-  populateNewTodoCategorySelect();
-  populateTimetableEditSelects();
-  render();
+  // ---- PIN 보호(index.html과 동일한 4자리 PIN, 같은 서버를 씀) ----
+  function showPinOverlay(message) {
+    pinError.textContent = message || '';
+    pinOverlay.classList.remove('hidden');
+    pinInput.value = '';
+    pinInput.focus();
+  }
+  function hidePinOverlay() {
+    pinOverlay.classList.add('hidden');
+  }
+
+  async function verifyPinCandidate(candidate) {
+    const res = await fetch(API_BASE + '/pin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: candidate }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'PIN 확인 실패');
+  }
+
+  pinSubmitBtn.addEventListener('click', async () => {
+    const candidate = pinInput.value.trim();
+    if (!/^\d{4}$/.test(candidate)) {
+      pinError.textContent = '4자리 숫자를 입력하세요';
+      return;
+    }
+    pinSubmitBtn.disabled = true;
+    try {
+      await verifyPinCandidate(candidate);
+      setStoredPin(candidate);
+      hidePinOverlay();
+      const ok = await bootstrapData();
+      if (ok) finishInit();
+    } catch (e) {
+      pinError.textContent = e.message || 'PIN이 올바르지 않습니다';
+    } finally {
+      pinSubmitBtn.disabled = false;
+    }
+  });
+  pinInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') pinSubmitBtn.click();
+  });
+
+  async function bootstrapData() {
+    try {
+      await refreshKvFromServer();
+    } catch (e) {
+      if (e && e.code === 'PIN_REQUIRED') {
+        showPinOverlay();
+      } else {
+        showPinOverlay('서버 연결 실패: ' + (e.message || '네트워크를 확인해주세요'));
+      }
+      return false;
+    }
+    hidePinOverlay();
+    return true;
+  }
+
+  function finishInit() {
+    populateNewTodoCategorySelect();
+    populateTimetableEditSelects();
+    render();
+
+    // index.html에서 바뀐 내용(카테고리 색 등)을 이 탭이 열려있는 동안 반영
+    setInterval(() => {
+      refreshKvFromServer().then(render).catch(onSyncError);
+    }, 60 * 1000);
+  }
+
+  (async function initApp() {
+    const ok = await bootstrapData();
+    if (ok) finishInit();
+  })();
 })();
 </script>
 </body>

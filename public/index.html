@@ -563,6 +563,16 @@
     font-size: 13px;
     padding: 16px 0;
   }
+  .labor-summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .labor-summary-row:last-child { border-bottom: none; }
+  .labor-summary-row span:last-child { font-weight: 700; }
+  .labor-summary-row span:last-child.danger { color: var(--danger); }
   .search-row {
     display: flex;
     align-items: center;
@@ -613,6 +623,74 @@
   .io-status {
     font-size: 12px;
     color: var(--text-muted);
+  }
+  .pin-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .pin-overlay.hidden { display: none !important; }
+  .pin-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 28px 32px;
+    text-align: center;
+    width: 240px;
+  }
+  .pin-box h2 { margin: 0 0 14px; font-size: 16px; }
+  .pin-box input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 20px;
+    letter-spacing: 8px;
+    text-align: center;
+    background: transparent;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .pin-box button {
+    width: 100%;
+    background: var(--accent);
+    color: var(--accent-text, #fff);
+    border: none;
+    border-radius: 8px;
+    padding: 9px;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .pin-error { color: #e5484d; font-size: 12px; margin-top: 10px; min-height: 14px; }
+  .pin-change-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: -10px 0 20px;
+  }
+  .pin-change-form input {
+    width: 110px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12.5px;
+    background: transparent;
+    color: var(--text);
+  }
+  .pin-change-form button {
+    background: var(--border);
+    color: var(--text);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    cursor: pointer;
   }
   .daily-card, .calendar-card {
     background: var(--card-bg);
@@ -939,6 +1017,14 @@
 </style>
 </head>
 <body>
+<div id="pinOverlay" class="pin-overlay">
+  <div class="pin-box">
+    <h2>🔒 PIN 입력</h2>
+    <input type="password" id="pinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="····">
+    <button type="button" id="pinSubmitBtn">확인</button>
+    <div class="pin-error" id="pinError"></div>
+  </div>
+</div>
 <div class="app">
 <div class="app-header">
   <header>
@@ -950,7 +1036,15 @@
     <button type="button" id="exportBtn">⬇ 백업 다운로드</button>
     <button type="button" id="importBtn">⬆ 백업 업로드</button>
     <input type="file" id="importFile" accept="application/json" class="hidden">
+    <button type="button" id="pinChangeToggleBtn">🔑 PIN 변경</button>
     <span class="io-status" id="ioStatus"></span>
+  </div>
+  <div class="pin-change-form hidden" id="pinChangeForm">
+    <input type="password" id="pinChangeOld" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="현재 PIN">
+    <input type="password" id="pinChangeNew" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="새 PIN(4자리)">
+    <input type="password" id="pinChangeConfirm" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="새 PIN 확인">
+    <button type="button" id="pinChangeSaveBtn">변경</button>
+    <button type="button" id="pinChangeCancelBtn">취소</button>
   </div>
 </div>
 
@@ -1067,9 +1161,22 @@
     <div class="summary-range" id="dailySummaryRange"></div>
     <div id="dailySummaryBody"></div>
   </section>
+
+  <section class="summary-card" id="laborSummarySection">
+    <div class="summary-header">
+      <h2>⏱️ 근무관리</h2>
+      <a class="mindmap-link" href="labor.html">자세히 →</a>
+    </div>
+    <div id="laborSummaryBody" class="labor-summary-body">
+      <div class="labor-summary-row"><span>이번 주 실제 근로</span><span id="laborStatActual">—</span></div>
+      <div class="labor-summary-row"><span>52시간 대비</span><span id="laborStatRemain">—</span></div>
+      <div class="labor-summary-row"><span>잔여 연차</span><span id="laborStatLeave">—</span></div>
+    </div>
+  </section>
 </div>
 </div>
 
+<script src="labor-engine.js"></script>
 <script>
 (function () {
   const STORAGE_KEY = 'workLog.entries';
@@ -1118,6 +1225,18 @@
   const importFile = document.getElementById('importFile');
   const ioStatus = document.getElementById('ioStatus');
 
+  const pinOverlay = document.getElementById('pinOverlay');
+  const pinInput = document.getElementById('pinInput');
+  const pinSubmitBtn = document.getElementById('pinSubmitBtn');
+  const pinError = document.getElementById('pinError');
+  const pinChangeToggleBtn = document.getElementById('pinChangeToggleBtn');
+  const pinChangeForm = document.getElementById('pinChangeForm');
+  const pinChangeOld = document.getElementById('pinChangeOld');
+  const pinChangeNew = document.getElementById('pinChangeNew');
+  const pinChangeConfirm = document.getElementById('pinChangeConfirm');
+  const pinChangeSaveBtn = document.getElementById('pinChangeSaveBtn');
+  const pinChangeCancelBtn = document.getElementById('pinChangeCancelBtn');
+
   const dailyInput = document.getElementById('dailyInput');
   const dailyFrequencyInput = document.getElementById('dailyFrequencyInput');
   const dailyWeekdayInput = document.getElementById('dailyWeekdayInput');
@@ -1141,16 +1260,108 @@
 
   let editingId = null;
 
-  function loadEntries() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    } catch {
-      return [];
+  // ---- 서버(Cloudflare D1) 연동 ----
+  // entries(영구 누적)는 행 단위 CRUD API(/api/entries), 나머지(완료 시 삭제돼
+  // 크기가 작게 유지되는 todos/categories/... )는 키 하나당 JSON 통째로 저장하는
+  // /api/kv 를 쓴다. 기존 loadXxx()/saveXxx() 동기 호출부는 그대로 두고, 그 안의
+  // "localStorage.getItem/setItem"만 "메모리 캐시 읽기 + 백그라운드로 서버에 반영"
+  // 으로 바꿔서, render() 등 나머지 코드는 손대지 않는다.
+  const API_BASE = '/api';
+  const PIN_KEY = 'workLog.pin';
+
+  function getStoredPin() {
+    return localStorage.getItem(PIN_KEY) || '';
+  }
+  function setStoredPin(pin) {
+    if (pin) localStorage.setItem(PIN_KEY, pin);
+    else localStorage.removeItem(PIN_KEY);
+  }
+
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(API_BASE + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + getStoredPin(), ...(opts.headers || {}) },
+    });
+    if (res.status === 401) {
+      setStoredPin('');
+      const err = new Error('PIN이 필요합니다');
+      err.code = 'PIN_REQUIRED';
+      throw err;
     }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `요청 실패(${res.status})`);
+    }
+    return res.status === 204 ? null : res.json();
+  }
+
+  function onSyncError(err) {
+    if (err && err.code === 'PIN_REQUIRED') {
+      showPinOverlay('PIN이 바뀐 것 같아요. 다시 입력해주세요.');
+      return;
+    }
+    showIoStatus('⚠ 서버 동기화 실패: ' + (err && err.message ? err.message : '네트워크를 확인해주세요'));
+  }
+
+  let entriesCache = [];
+  let kvCache = {};
+  let laborRecordsCache = {};
+  let leaveLedgerCache = [];
+
+  async function refreshEntriesFromServer() {
+    entriesCache = (await apiFetch('/entries')) || [];
+  }
+  async function refreshKvFromServer() {
+    kvCache = (await apiFetch('/kv')) || {};
+  }
+  // 메인 화면의 근무관리 요약 타일(주간 근로시간/52h 대비/잔여 연차)용 - 상세
+  // 입력/수정은 labor.html 전담, 여기서는 읽기만 한다.
+  async function refreshLaborSummaryData() {
+    const [records, leave] = await Promise.all([apiFetch('/labor/records'), apiFetch('/labor/leave')]);
+    laborRecordsCache = records || {};
+    leaveLedgerCache = leave || [];
+  }
+
+  function kvGet(key) {
+    return kvCache[key];
+  }
+  function kvSet(key, value) {
+    kvCache[key] = value;
+    apiFetch('/kv/' + encodeURIComponent(key), { method: 'PUT', body: JSON.stringify(value) }).catch(onSyncError);
+  }
+
+  // entries는 "항목 전체를 다시 저장"하는 기존 호출 패턴(saveEntries(전체배열))을
+  // 그대로 받되, 캐시와 비교해 바뀐 것만 POST/PUT, 빠진 것만 DELETE로 반영한다.
+  function diffAndSyncEntries(newEntries) {
+    const oldById = new Map(entriesCache.map((e) => [e.id, e]));
+    const newById = new Map(newEntries.map((e) => [e.id, e]));
+    entriesCache = newEntries;
+
+    newById.forEach((entry, id) => {
+      const old = oldById.get(id);
+      if (!old) {
+        apiFetch('/entries', { method: 'POST', body: JSON.stringify(entry) }).catch(onSyncError);
+      } else if (JSON.stringify(old) !== JSON.stringify(entry)) {
+        apiFetch('/entries/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(entry) }).catch(onSyncError);
+      }
+    });
+    oldById.forEach((_, id) => {
+      if (!newById.has(id)) {
+        apiFetch('/entries/' + encodeURIComponent(id), { method: 'DELETE' }).catch(onSyncError);
+      }
+    });
+  }
+
+  function loadEntries() {
+    // 호출부들이 "const entries = loadEntries(); entries.push(...); saveEntries(entries);"
+    // 처럼 바로 mutate하는 패턴을 쓰므로, 캐시 원본을 그대로 주면 push가 entriesCache를
+    // 먼저 바꿔버려서 diffAndSyncEntries가 "변경 없음"으로 오판해 동기화가 누락된다.
+    // 매번 복사본을 돌려줘야 diff가 캐시(변경 전)와 전달받은 배열(변경 후)을 올바르게 비교한다.
+    return entriesCache.slice();
   }
 
   function saveEntries(entries) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    diffAndSyncEntries(entries);
   }
 
   function toDatetimeLocalValue(date) {
@@ -1219,39 +1430,28 @@
   const PROJECT_COLOR_MAP_KEY = 'workLog.projectColors';
 
   function loadProjects() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY));
-      return Array.isArray(stored) ? stored : [];
-    } catch {
-      return [];
-    }
+    const stored = kvGet(PROJECT_STORAGE_KEY);
+    return Array.isArray(stored) ? stored : [];
+  }
+
+  function saveProjects(projects) {
+    kvSet(PROJECT_STORAGE_KEY, projects);
   }
 
   function loadProjectColorMap() {
-    try {
-      return JSON.parse(localStorage.getItem(PROJECT_COLOR_MAP_KEY)) || {};
-    } catch {
-      return {};
-    }
+    return kvGet(PROJECT_COLOR_MAP_KEY) || {};
   }
 
-  // 카테고리 태그 하나를 그릴 때마다(항목 개수만큼 매 렌더 반복) localStorage를
-  // 다시 읽고 JSON.parse하는 게 누적되면 비용이 커서, 메모리에 캐싱해두고
-  // saveCategoryColorMap()으로 실제 저장할 때만 캐시를 갱신함.
-  let categoryColorMapCache = null;
+  function saveProjectColorMap(map) {
+    kvSet(PROJECT_COLOR_MAP_KEY, map);
+  }
+
   function loadCategoryColorMap() {
-    if (categoryColorMapCache) return categoryColorMapCache;
-    try {
-      categoryColorMapCache = JSON.parse(localStorage.getItem(CATEGORY_COLOR_MAP_KEY)) || {};
-    } catch {
-      categoryColorMapCache = {};
-    }
-    return categoryColorMapCache;
+    return kvGet(CATEGORY_COLOR_MAP_KEY) || {};
   }
 
   function saveCategoryColorMap(map) {
-    localStorage.setItem(CATEGORY_COLOR_MAP_KEY, JSON.stringify(map));
-    categoryColorMapCache = map;
+    kvSet(CATEGORY_COLOR_MAP_KEY, map);
   }
 
   function setCategoryColorOverride(name, slotIndex) {
@@ -1319,16 +1519,14 @@
   // ---- 카테고리 ----
 
   function loadCategories() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
-      if (Array.isArray(stored)) return stored;
-    } catch {}
+    const stored = kvGet(CATEGORY_STORAGE_KEY);
+    if (Array.isArray(stored)) return stored;
     saveCategories(DEFAULT_CATEGORIES);
     return [...DEFAULT_CATEGORIES];
   }
 
   function saveCategories(categories) {
-    localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+    kvSet(CATEGORY_STORAGE_KEY, categories);
   }
 
   function buildCategoryOptions(selectEl, currentValue) {
@@ -1750,11 +1948,7 @@
   // ---- TODO ----
 
   function loadTodos() {
-    try {
-      return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY)) || [];
-    } catch {
-      return [];
-    }
+    return kvGet(TODO_STORAGE_KEY) || [];
   }
 
   // 이전 버전(체크 시 목록에 남아있던 방식)에서 완료 표시된 TODO가 있다면
@@ -1782,7 +1976,7 @@
   }
 
   function saveTodos(todos) {
-    localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todos));
+    kvSet(TODO_STORAGE_KEY, todos);
   }
 
   function addTodo() {
@@ -1890,27 +2084,19 @@
   const DAILY_COMPLETIONS_KEY = 'workLog.dailyCompletions';
 
   function loadDailyTemplates() {
-    try {
-      return JSON.parse(localStorage.getItem(DAILY_STORAGE_KEY)) || [];
-    } catch {
-      return [];
-    }
+    return kvGet(DAILY_STORAGE_KEY) || [];
   }
 
   function saveDailyTemplates(templates) {
-    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(templates));
+    kvSet(DAILY_STORAGE_KEY, templates);
   }
 
   function loadDailyCompletions() {
-    try {
-      return JSON.parse(localStorage.getItem(DAILY_COMPLETIONS_KEY)) || [];
-    } catch {
-      return [];
-    }
+    return kvGet(DAILY_COMPLETIONS_KEY) || [];
   }
 
   function saveDailyCompletions(completions) {
-    localStorage.setItem(DAILY_COMPLETIONS_KEY, JSON.stringify(completions));
+    kvSet(DAILY_COMPLETIONS_KEY, completions);
   }
 
   function addDailyTemplate() {
@@ -2177,15 +2363,11 @@
   const CALENDAR_STORAGE_KEY = 'workLog.calendarEvents';
 
   function loadCalendarEvents() {
-    try {
-      return JSON.parse(localStorage.getItem(CALENDAR_STORAGE_KEY)) || [];
-    } catch {
-      return [];
-    }
+    return kvGet(CALENDAR_STORAGE_KEY) || [];
   }
 
   function saveCalendarEvents(events) {
-    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(events));
+    kvSet(CALENDAR_STORAGE_KEY, events);
   }
 
   function addCalendarEvent() {
@@ -2607,6 +2789,9 @@
       calendarEvents: loadCalendarEvents(),
       projects: loadProjects(),
       projectColors: loadProjectColorMap(),
+      laborSettings: kvGet('workLog.laborSettings') || {},
+      laborRecords: laborRecordsCache,
+      leaveLedger: leaveLedgerCache,
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -2640,8 +2825,8 @@
     showIoStatus('🔄 오늘의 자동 백업이 저장되었습니다');
   }
 
-  maybeAutoBackup();
-  setInterval(maybeAutoBackup, 15 * 60 * 1000); // 자정을 넘겨 계속 켜둔 경우 대비, 15분마다 재확인
+  // maybeAutoBackup()의 최초 실행/주기 실행은 서버에서 데이터를 다 불러온 뒤에
+  // 시작한다(finishInit() 참고) - 로드 전에 돌면 빈 캐시를 백업해버릴 수 있음.
 
   importBtn.addEventListener('click', () => importFile.click());
 
@@ -2692,10 +2877,30 @@
           saveCalendarEvents([...existing, ...data.calendarEvents.filter((e) => !existingIds.has(e.id))]);
         }
         if (Array.isArray(data.projects) && data.projects.length) {
-          localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(Array.from(new Set([...loadProjects(), ...data.projects]))));
+          saveProjects(Array.from(new Set([...loadProjects(), ...data.projects])));
         }
         if (data.projectColors && typeof data.projectColors === 'object') {
-          localStorage.setItem(PROJECT_COLOR_MAP_KEY, JSON.stringify({ ...loadProjectColorMap(), ...data.projectColors }));
+          saveProjectColorMap({ ...loadProjectColorMap(), ...data.projectColors });
+        }
+        if (data.laborSettings && typeof data.laborSettings === 'object') {
+          const merged = { ...(kvGet('workLog.laborSettings') || {}), ...data.laborSettings };
+          kvSet('workLog.laborSettings', merged);
+        }
+        if (data.laborRecords && typeof data.laborRecords === 'object') {
+          Object.keys(data.laborRecords).forEach((dateStr) => {
+            if (laborRecordsCache[dateStr]) return; // 기존 기록 우선, 덮어쓰지 않음
+            laborRecordsCache = { ...laborRecordsCache, [dateStr]: data.laborRecords[dateStr] };
+            apiFetch('/labor/records/' + encodeURIComponent(dateStr), {
+              method: 'PUT', body: JSON.stringify(data.laborRecords[dateStr]),
+            }).catch(onSyncError);
+          });
+        }
+        if (Array.isArray(data.leaveLedger)) {
+          const existingIds = new Set(leaveLedgerCache.map((e) => e.id));
+          data.leaveLedger.filter((e) => !existingIds.has(e.id)).forEach((e) => {
+            leaveLedgerCache = [...leaveLedgerCache, e];
+            apiFetch('/labor/leave', { method: 'POST', body: JSON.stringify(e) }).catch(onSyncError);
+          });
         }
 
         renderCategorySelect();
@@ -2707,6 +2912,7 @@
         renderTodos();
         renderDaily();
         renderCalendar();
+        renderLaborSummary();
         showIoStatus(`백업 업로드 완료 (업무일지 ${addedEntries}건, TODO ${addedTodos}건 추가)`);
       } catch {
         showIoStatus('백업 업로드 실패: JSON 파일 형식을 확인해주세요.');
@@ -2724,17 +2930,150 @@
     });
   }
 
-  migrateCompletedTodos();
-  resetForm();
-  refreshTodoCategoryInput();
-  refreshSearchCategoryInput();
-  refreshDailyCategoryInput();
-  refreshCalCategoryInput();
-  calDateInput.value = getTodayStr();
-  render();
-  renderTodos();
-  renderDaily();
-  renderCalendar();
+  // ---- PIN 보호 ----
+  // 나만 쓰는 도구라 복잡한 로그인 대신 4자리 PIN 하나만 사용(초기값 0000).
+  // 저장된 PIN이 없거나 서버가 401을 돌려주면(비번이 틀렸거나 다른 곳에서
+  // 바뀜) 오버레이를 띄우고, 맞게 입력하면 그제서야 데이터를 불러와 화면을 그림.
+  function showPinOverlay(message) {
+    pinError.textContent = message || '';
+    pinOverlay.classList.remove('hidden');
+    pinInput.value = '';
+    pinInput.focus();
+  }
+  function hidePinOverlay() {
+    pinOverlay.classList.add('hidden');
+  }
+
+  async function verifyPinCandidate(candidate) {
+    const res = await fetch(API_BASE + '/pin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: candidate }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'PIN 확인 실패');
+  }
+
+  pinSubmitBtn.addEventListener('click', async () => {
+    const candidate = pinInput.value.trim();
+    if (!/^\d{4}$/.test(candidate)) {
+      pinError.textContent = '4자리 숫자를 입력하세요';
+      return;
+    }
+    pinSubmitBtn.disabled = true;
+    try {
+      await verifyPinCandidate(candidate);
+      setStoredPin(candidate);
+      hidePinOverlay();
+      const ok = await bootstrapData();
+      if (ok) finishInit();
+    } catch (e) {
+      pinError.textContent = e.message || 'PIN이 올바르지 않습니다';
+    } finally {
+      pinSubmitBtn.disabled = false;
+    }
+  });
+  pinInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') pinSubmitBtn.click();
+  });
+
+  pinChangeToggleBtn.addEventListener('click', () => pinChangeForm.classList.toggle('hidden'));
+  pinChangeCancelBtn.addEventListener('click', () => {
+    pinChangeForm.classList.add('hidden');
+    pinChangeOld.value = '';
+    pinChangeNew.value = '';
+    pinChangeConfirm.value = '';
+  });
+  pinChangeSaveBtn.addEventListener('click', async () => {
+    const oldPin = pinChangeOld.value.trim();
+    const newPin = pinChangeNew.value.trim();
+    const confirmPin = pinChangeConfirm.value.trim();
+    if (!/^\d{4}$/.test(oldPin)) { showIoStatus('현재 PIN을 4자리로 입력하세요'); return; }
+    if (!/^\d{4}$/.test(newPin)) { showIoStatus('새 PIN은 4자리 숫자여야 합니다'); return; }
+    if (newPin !== confirmPin) { showIoStatus('새 PIN 확인이 일치하지 않습니다'); return; }
+    const prevStoredPin = getStoredPin();
+    setStoredPin(oldPin); // apiFetch가 Authorization에 쓸 "현재 PIN" 증명
+    try {
+      await apiFetch('/pin', { method: 'PATCH', body: JSON.stringify({ newPin }) });
+      setStoredPin(newPin);
+      pinChangeForm.classList.add('hidden');
+      pinChangeOld.value = '';
+      pinChangeNew.value = '';
+      pinChangeConfirm.value = '';
+      showIoStatus('PIN이 변경되었습니다');
+    } catch (e) {
+      setStoredPin(prevStoredPin); // 틀렸으면 되돌려서 다음 요청들이 계속 실패하지 않게
+      showIoStatus('PIN 변경 실패: ' + (e.message || '현재 PIN을 확인해주세요'));
+    }
+  });
+
+  // ---- 초기 로드 ----
+  function renderLaborSummary() {
+    const settings = WorkLog.LaborEngine.mergeSettings(kvGet('workLog.laborSettings'));
+    const mon = WorkLog.LaborEngine.mondayOf(getTodayStr());
+    const sum = WorkLog.LaborEngine.calcWeeklySummary(mon, laborRecordsCache, settings, getTodayStr());
+    document.getElementById('laborStatActual').textContent = (sum.actualSoFarMinutes / 60).toFixed(1) + '시간';
+    const remainEl = document.getElementById('laborStatRemain');
+    const ra = sum.remainingVsActual;
+    remainEl.textContent = ra < 0 ? `${(-ra / 60).toFixed(1)}시간 초과` : `${(ra / 60).toFixed(1)}시간 남음`;
+    remainEl.classList.toggle('danger', ra < 0);
+    const bal = WorkLog.LaborEngine.calcLeaveBalance(leaveLedgerCache, laborRecordsCache, getTodayStr());
+    document.getElementById('laborStatLeave').textContent = bal.remainingExcludingPlanned.toFixed(1) + '시간';
+  }
+
+  async function bootstrapData() {
+    try {
+      await Promise.all([refreshEntriesFromServer(), refreshKvFromServer(), refreshLaborSummaryData()]);
+    } catch (e) {
+      if (e && e.code === 'PIN_REQUIRED') {
+        showPinOverlay();
+      } else {
+        showPinOverlay('서버 연결 실패: ' + (e.message || '네트워크를 확인해주세요'));
+      }
+      return false;
+    }
+    hidePinOverlay();
+    return true;
+  }
+
+  function finishInit() {
+    migrateCompletedTodos();
+    resetForm();
+    refreshTodoCategoryInput();
+    refreshSearchCategoryInput();
+    refreshDailyCategoryInput();
+    refreshCalCategoryInput();
+    calDateInput.value = getTodayStr();
+    render();
+    renderTodos();
+    renderDaily();
+    renderCalendar();
+    renderLaborSummary();
+
+    // 데이터가 실제로 로드된 뒤에만 자동 백업이 의미 있음
+    maybeAutoBackup();
+    setInterval(maybeAutoBackup, 15 * 60 * 1000);
+
+    // 다른 기기에서 바뀐 내용을 이 탭이 열려있는 동안 주기적으로 반영(완전한
+    // 실시간 동기화는 아니지만 개인용 도구에는 이 정도 polling으로 충분함).
+    setInterval(() => {
+      refreshEntriesFromServer().then(render).catch(onSyncError);
+      refreshKvFromServer()
+        .then(() => {
+          renderTodos();
+          renderDaily();
+          renderCalendar();
+          renderLaborSummary();
+        })
+        .catch(onSyncError);
+      refreshLaborSummaryData().then(renderLaborSummary).catch(onSyncError);
+    }, 60 * 1000);
+  }
+
+  (async function initApp() {
+    const ok = await bootstrapData();
+    if (ok) finishInit();
+  })();
 })();
 </script>
 </body>
