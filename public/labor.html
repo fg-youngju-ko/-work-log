@@ -166,9 +166,10 @@
       </div>
       <div class="card">
         <h2>잔여 연차</h2>
+        <div class="stat-row"><span class="stat-label">입사일</span><span class="stat-val" id="statHireDate" style="font-size:13px">—</span></div>
         <div class="stat-row"><span class="stat-label">잔여(사용 예정 제외)</span><span class="stat-val" id="statLeaveRemain">—</span></div>
         <div class="stat-row"><span class="stat-label">잔여(예정 사용 반영)</span><span class="stat-val" id="statLeaveRemainPlanned">—</span></div>
-        <div class="stat-row" style="margin-top:4px"><button class="small-btn" id="openLeaveBtn" style="width:100%">연차 부여/조정 관리</button></div>
+        <div class="stat-row" style="margin-top:4px"><button class="small-btn" id="openLeaveBtn" style="width:100%">연차 일수 입력/조정</button></div>
       </div>
       <div class="card">
         <h2>이번 달 세전 예상 급여</h2>
@@ -263,10 +264,14 @@
 <!-- 연차 부여/조정 모달 -->
 <div class="modal-overlay" id="leaveModalOverlay">
   <div class="modal">
-    <h3>연차 부여/조정</h3>
+    <h3>연차 일수 입력/조정</h3>
+    <div class="field">
+      <label>입사일</label>
+      <input type="text" id="hireDateInput" placeholder="YYYY-MM-DD">
+    </div>
     <div class="field-row">
       <div class="field"><label>날짜</label><input type="text" id="leaveDate" placeholder="YYYY-MM-DD"></div>
-      <div class="field"><label>시간(일 단위면 8의 배수)</label><input type="number" id="leaveHoursInput" step="0.5" placeholder="예) 15"></div>
+      <div class="field"><label>일수(1일=1, 반차면 0.5)</label><input type="number" id="leaveDaysInput" step="0.5" placeholder="예) 15"></div>
     </div>
     <div class="field">
       <label>구분</label>
@@ -518,10 +523,19 @@
     rpEl.className = 'stat-val' + (rp < 0 ? ' danger' : '');
   }
 
+  // 연차는 법적으로 "일" 단위 개념이라, 내부 저장(시간)과 별개로 화면/입력은
+  // 전부 "일"로 보여준다 - 1일 = 그 사람의 소정근로시간(기본 8h)만큼의 시간.
+  function dayLengthHours() { return currentSettings().dailyScheduledMinutes / 60; }
+  function hoursToDaysLabel(hours) {
+    const days = hours / dayLengthHours();
+    return (Math.round(days * 100) / 100).toString().replace(/\.00$/, '') + '일';
+  }
+
   function renderLeaveSummary() {
     const bal = WorkLog.LaborEngine.calcLeaveBalance(leaveLedger, laborRecords, todayStr());
-    document.getElementById('statLeaveRemain').textContent = bal.remainingExcludingPlanned.toFixed(1) + '시간';
-    document.getElementById('statLeaveRemainPlanned').textContent = bal.remaining.toFixed(1) + '시간';
+    document.getElementById('statLeaveRemain').textContent = hoursToDaysLabel(bal.remainingExcludingPlanned);
+    document.getElementById('statLeaveRemainPlanned').textContent = hoursToDaysLabel(bal.remaining);
+    document.getElementById('statHireDate').textContent = currentSettings().hireDate || '미설정';
   }
 
   function monthRange() {
@@ -746,17 +760,28 @@
 
   // ---- 연차 부여/조정 모달 ----
   const leaveModalOverlay = document.getElementById('leaveModalOverlay');
-  document.getElementById('openLeaveBtn').addEventListener('click', () => { renderLeaveLedger(); leaveModalOverlay.classList.add('show'); });
+  document.getElementById('openLeaveBtn').addEventListener('click', () => {
+    document.getElementById('hireDateInput').value = currentSettings().hireDate || '';
+    renderLeaveLedger();
+    leaveModalOverlay.classList.add('show');
+  });
   document.getElementById('leaveCancelBtn').addEventListener('click', () => leaveModalOverlay.classList.remove('show'));
+  document.getElementById('hireDateInput').addEventListener('change', (e) => {
+    const v = e.target.value.trim();
+    if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    saveLaborSettings({ ...laborSettings, hireDate: v || null });
+    renderLeaveSummary();
+  });
   document.getElementById('leaveAddBtn').addEventListener('click', async () => {
     const date = document.getElementById('leaveDate').value.trim();
-    const hours = Number(document.getElementById('leaveHoursInput').value);
+    const days = Number(document.getElementById('leaveDaysInput').value);
     const kind = document.getElementById('leaveKind').value;
     const memo = document.getElementById('leaveMemo').value.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(hours)) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(days)) return;
+    const hours = days * dayLengthHours();
     await addLeaveLedgerEntry({ date, hours, kind, memo });
     document.getElementById('leaveDate').value = '';
-    document.getElementById('leaveHoursInput').value = '';
+    document.getElementById('leaveDaysInput').value = '';
     document.getElementById('leaveMemo').value = '';
     renderLeaveLedger();
     renderLeaveSummary();
@@ -767,7 +792,7 @@
     leaveLedger.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).forEach((e) => {
       const row = document.createElement('div');
       row.className = 'ledger-row';
-      row.innerHTML = `<span>${e.date} · ${e.kind === 'grant' ? '부여' : '조정'} ${e.hours}h${e.memo ? ' · ' + e.memo : ''}</span>`;
+      row.innerHTML = `<span>${e.date} · ${e.kind === 'grant' ? '부여' : '조정'} ${hoursToDaysLabel(e.hours)}${e.memo ? ' · ' + e.memo : ''}</span>`;
       const del = document.createElement('button');
       del.textContent = '삭제';
       del.addEventListener('click', () => { deleteLeaveLedgerEntry(e.id); renderLeaveLedger(); renderLeaveSummary(); });

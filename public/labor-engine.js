@@ -72,6 +72,7 @@
     lunchEnd: '13:00',
     dinnerStart: '17:30',
     dinnerEnd: '18:00',
+    hireDate: null, // 표시용(연차 자동 산정에는 쓰지 않음 - 부여/조정은 수동)
   };
 
   function mergeSettings(s) {

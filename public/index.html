@@ -3018,7 +3018,9 @@
     remainEl.textContent = ra < 0 ? `${(-ra / 60).toFixed(1)}시간 초과` : `${(ra / 60).toFixed(1)}시간 남음`;
     remainEl.classList.toggle('danger', ra < 0);
     const bal = WorkLog.LaborEngine.calcLeaveBalance(leaveLedgerCache, laborRecordsCache, getTodayStr());
-    document.getElementById('laborStatLeave').textContent = bal.remainingExcludingPlanned.toFixed(1) + '시간';
+    const dayLength = settings.dailyScheduledMinutes / 60;
+    const days = bal.remainingExcludingPlanned / dayLength;
+    document.getElementById('laborStatLeave').textContent = (Math.round(days * 100) / 100).toString().replace(/\.00$/, '') + '일';
   }
 
   async function bootstrapData() {
