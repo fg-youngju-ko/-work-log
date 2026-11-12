@@ -310,6 +310,17 @@
     cursor: default;
   }
   .memo-trigger:hover .memo-popup { display: block; }
+  .link-trigger {
+    font-size: 11px;
+    color: var(--accent-dark);
+    text-decoration: none;
+    cursor: pointer;
+    padding: 1px 7px;
+    border-radius: 6px;
+    border: 1px dashed var(--accent);
+    white-space: nowrap;
+  }
+  .link-trigger:hover { background: var(--accent-wash); }
   .memo-edit { margin-top: 8px; }
   .memo-edit input[type="text"] {
     width: 100%;
@@ -1883,11 +1894,13 @@
               <span class="memo-trigger-label"></span>
               <span class="memo-popup"></span>
             </span>
+            <a class="link-trigger hidden" target="_blank" rel="noopener noreferrer">🔗 링크</a>
           </div>
           <div class="todo-meta">생성 ${formatKoreanShort(item.createdAt)}</div>
           <div class="memo-edit hidden">
             <input type="text" class="memo-text-input" placeholder="할 일 내용">
             <textarea class="memo-textarea" placeholder="상세 메모를 입력하세요"></textarea>
+            <input type="text" class="memo-link-input" placeholder="🔗 주소(슬랙/메일/문서 링크, 선택)">
             <div class="memo-edit-actions">
               <label class="memo-category-label">카테고리 <select class="memo-category-select"></select></label>
               <div class="memo-edit-buttons">
@@ -1919,15 +1932,26 @@
     const memoEdit = li.querySelector('.memo-edit');
     const memoTextInput = li.querySelector('.memo-text-input');
     const memoTextarea = li.querySelector('.memo-textarea');
+    const memoLinkInput = li.querySelector('.memo-link-input');
     const memoCategorySelect = li.querySelector('.memo-category-select');
+    const linkTrigger = li.querySelector('.link-trigger');
 
     memoLabel.textContent = item.memo ? '📝 메모' : '+ 메모';
     memoPopup.textContent = item.memo || '';
     buildCategoryOptions(memoCategorySelect, item.category || '');
 
+    const safeLink = sanitizeLinkUrl(item.link);
+    if (safeLink) {
+      linkTrigger.href = safeLink;
+      linkTrigger.classList.remove('hidden');
+    } else {
+      linkTrigger.classList.add('hidden');
+    }
+
     memoTrigger.addEventListener('click', () => {
       memoTextInput.value = item.text;
       memoTextarea.value = item.memo || '';
+      memoLinkInput.value = item.link || '';
       buildCategoryOptions(memoCategorySelect, item.category || '');
       memoEdit.classList.toggle('hidden');
       if (!memoEdit.classList.contains('hidden')) memoTextInput.focus();
@@ -1941,8 +1965,18 @@
         memoTextInput.focus();
         return;
       }
-      handlers.onSaveMemo(item, newText, memoTextarea.value.trim(), memoCategorySelect.value || null);
+      handlers.onSaveMemo(item, newText, memoTextarea.value.trim(), memoCategorySelect.value || null, memoLinkInput.value.trim());
     });
+  }
+
+  // javascript: 등 위험한 스킴으로 링크 버튼의 href가 되는 걸 막기 위한 허용목록.
+  // 스킴이 없으면(예: "naver.com") 웹 링크로 보고 https://를 붙여준다.
+  function sanitizeLinkUrl(raw) {
+    const v = (raw || '').trim();
+    if (!v) return '';
+    if (/^(https?:|mailto:|slack:)/i.test(v)) return v;
+    if (/^[\w.-]+\.[a-z]{2,}([/?#].*)?$/i.test(v)) return 'https://' + v;
+    return '';
   }
 
   // ---- TODO ----
@@ -2024,8 +2058,8 @@
     render();
   }
 
-  function saveTodoMemo(id, text, memo, category) {
-    const todos = loadTodos().map((t) => (t.id === id ? { ...t, text, memo, category } : t));
+  function saveTodoMemo(id, text, memo, category, link) {
+    const todos = loadTodos().map((t) => (t.id === id ? { ...t, text, memo, category, link } : t));
     saveTodos(todos);
     renderTodos();
   }
@@ -2060,10 +2094,10 @@
     const handlers = {
       onComplete: (item) => (item.__source === 'calendar' ? completeCalendarEvent(item.id) : completeTodo(item.id)),
       onDelete: (item) => (item.__source === 'calendar' ? deleteCalendarEvent(item.id) : deleteTodo(item.id)),
-      onSaveMemo: (item, text, memo, category) =>
+      onSaveMemo: (item, text, memo, category, link) =>
         item.__source === 'calendar'
-          ? saveCalendarEventMemo(item.id, text, memo, category)
-          : saveTodoMemo(item.id, text, memo, category),
+          ? saveCalendarEventMemo(item.id, text, memo, category, link)
+          : saveTodoMemo(item.id, text, memo, category, link),
     };
 
     todoList.querySelectorAll('.todo-item').forEach((li) => {
@@ -2163,8 +2197,8 @@
     renderDailyTemplateList();
   }
 
-  function saveDailyMemo(id, text, memo, category) {
-    saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === id ? { ...t, text, memo, category } : t)));
+  function saveDailyMemo(id, text, memo, category, link) {
+    saveDailyTemplates(loadDailyTemplates().map((t) => (t.id === id ? { ...t, text, memo, category, link } : t)));
     renderDaily();
     renderDailyTemplateList();
   }
@@ -2220,7 +2254,7 @@
     const handlers = {
       onComplete: (item) => completeDailyToday(item.id),
       onDelete: (item) => deleteDailyTemplate(item.id),
-      onSaveMemo: (item, text, memo, category) => saveDailyMemo(item.id, text, memo, category),
+      onSaveMemo: (item, text, memo, category, link) => saveDailyMemo(item.id, text, memo, category, link),
     };
 
     dailyList.querySelectorAll('.todo-item').forEach((li) => {
@@ -2425,8 +2459,8 @@
     renderTodos();
   }
 
-  function saveCalendarEventMemo(id, text, memo, category) {
-    saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === id ? { ...e, text, memo, category } : e)));
+  function saveCalendarEventMemo(id, text, memo, category, link) {
+    saveCalendarEvents(loadCalendarEvents().map((e) => (e.id === id ? { ...e, text, memo, category, link } : e)));
     renderCalendar();
     renderTodos();
   }
