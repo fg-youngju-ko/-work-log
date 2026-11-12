@@ -245,6 +245,48 @@
     color: var(--text);
   }
   #todoAddBtn { background: var(--accent); color: var(--accent-text); padding: 8px 16px; }
+  .add-extra-toggle {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .add-extra-toggle:hover { background: var(--bg); }
+  .add-extra-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .add-extra-panel.hidden { display: none; }
+  .add-extra-panel textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 56px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-family: inherit;
+    font-size: 13px;
+    background: transparent;
+    color: var(--text);
+    resize: vertical;
+  }
+  .add-extra-panel input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-family: inherit;
+    font-size: 13px;
+    background: transparent;
+    color: var(--text);
+  }
   .todo-list {
     list-style: none;
     margin: 12px 0 0;
@@ -1068,7 +1110,12 @@
     <div class="todo-input-row">
       <input type="text" id="todoInput" placeholder="할 일을 입력하세요">
       <select id="todoCategoryInput"></select>
+      <button type="button" class="add-extra-toggle" id="todoExtraToggleBtn">📝 작성하기</button>
       <button id="todoAddBtn">추가</button>
+    </div>
+    <div class="add-extra-panel hidden" id="todoExtraPanel">
+      <textarea id="todoExtraMemo" placeholder="상세 메모"></textarea>
+      <input type="text" id="todoExtraLink" placeholder="🔗 주소(슬랙/메일/문서 링크, 선택)">
     </div>
     <ul class="todo-list" id="todoList"></ul>
   </section>
@@ -1120,7 +1167,12 @@
       </select>
       <input type="time" id="dailyTimeInput">
       <select id="dailyCategoryInput"></select>
+      <button type="button" class="add-extra-toggle" id="dailyExtraToggleBtn">📝 작성하기</button>
       <button id="dailyAddBtn">추가</button>
+    </div>
+    <div class="add-extra-panel hidden" id="dailyExtraPanel">
+      <textarea id="dailyExtraMemo" placeholder="상세 메모"></textarea>
+      <input type="text" id="dailyExtraLink" placeholder="🔗 주소(슬랙/메일/문서 링크, 선택)">
     </div>
     <ul class="todo-list" id="dailyList"></ul>
     <div class="daily-tpl-list hidden" id="dailyTemplateList"></div>
@@ -1161,7 +1213,12 @@
       <input type="date" id="calDateInput">
       <input type="text" id="calTextInput" placeholder="해당 날짜에 할 일을 입력하세요">
       <select id="calCategoryInput"></select>
+      <button type="button" class="add-extra-toggle" id="calExtraToggleBtn">📝 작성하기</button>
       <button type="button" id="calAddBtn">추가</button>
+    </div>
+    <div class="add-extra-panel hidden" id="calExtraPanel">
+      <textarea id="calExtraMemo" placeholder="상세 메모"></textarea>
+      <input type="text" id="calExtraLink" placeholder="🔗 주소(슬랙/메일/문서 링크, 선택)">
     </div>
   </section>
 
@@ -1209,6 +1266,10 @@
   const todoCategoryInput = document.getElementById('todoCategoryInput');
   const todoAddBtn = document.getElementById('todoAddBtn');
   const todoList = document.getElementById('todoList');
+  const todoExtraToggleBtn = document.getElementById('todoExtraToggleBtn');
+  const todoExtraPanel = document.getElementById('todoExtraPanel');
+  const todoExtraMemo = document.getElementById('todoExtraMemo');
+  const todoExtraLink = document.getElementById('todoExtraLink');
 
   const categoryInput = document.getElementById('categoryInput');
   const categoryManageBtn = document.getElementById('categoryManageBtn');
@@ -1257,6 +1318,10 @@
   const dailyList = document.getElementById('dailyList');
   const dailyTemplateToggleBtn = document.getElementById('dailyTemplateToggleBtn');
   const dailyTemplateList = document.getElementById('dailyTemplateList');
+  const dailyExtraToggleBtn = document.getElementById('dailyExtraToggleBtn');
+  const dailyExtraPanel = document.getElementById('dailyExtraPanel');
+  const dailyExtraMemo = document.getElementById('dailyExtraMemo');
+  const dailyExtraLink = document.getElementById('dailyExtraLink');
 
   const calPrevBtn = document.getElementById('calPrevBtn');
   const calNextBtn = document.getElementById('calNextBtn');
@@ -1266,6 +1331,10 @@
   const calTextInput = document.getElementById('calTextInput');
   const calCategoryInput = document.getElementById('calCategoryInput');
   const calAddBtn = document.getElementById('calAddBtn');
+  const calExtraToggleBtn = document.getElementById('calExtraToggleBtn');
+  const calExtraPanel = document.getElementById('calExtraPanel');
+  const calExtraMemo = document.getElementById('calExtraMemo');
+  const calExtraLink = document.getElementById('calExtraLink');
   let calViewDate = new Date();
   let openCalendarDate = null;
 
@@ -1410,6 +1479,21 @@
         btn.classList.remove('confirming');
       }, 2500);
     });
+  }
+
+  // 새 항목 추가 입력란 아래 "메모/링크" 패널을 접었다 펼쳤다 하는 공용 토글.
+  // 평소엔 접혀있고, 버튼을 눌러야 펼쳐진다(기본 추가 흐름을 번잡하게 안 만들려고).
+  function bindExtraToggle(btn, panel) {
+    btn.addEventListener('click', () => {
+      panel.classList.toggle('hidden');
+      btn.textContent = panel.classList.contains('hidden') ? '📝 작성하기' : '접기';
+    });
+  }
+  function collapseExtraPanel(btn, panel, memoInput, linkInput) {
+    memoInput.value = '';
+    linkInput.value = '';
+    panel.classList.add('hidden');
+    btn.textContent = '📝 작성하기';
   }
 
   // ---- 카테고리 색상 ----
@@ -2023,13 +2107,15 @@
     todos.push({
       id: crypto.randomUUID(),
       text,
-      memo: '',
+      memo: todoExtraMemo.value.trim(),
+      link: todoExtraLink.value.trim(),
       category: todoCategoryInput.value || null,
       createdAt: new Date().toISOString(),
     });
     saveTodos(todos);
     todoInput.value = '';
     todoCategoryInput.value = '';
+    collapseExtraPanel(todoExtraToggleBtn, todoExtraPanel, todoExtraMemo, todoExtraLink);
     todoInput.focus();
     renderTodos();
   }
@@ -2110,6 +2196,7 @@
   todoInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addTodo();
   });
+  bindExtraToggle(todoExtraToggleBtn, todoExtraPanel);
 
   // ---- 데일리 업무 (날짜가 바뀌면 자동으로 다시 나타나는 반복 업무) ----
 
@@ -2145,7 +2232,8 @@
     templates.push({
       id: crypto.randomUUID(),
       text,
-      memo: '',
+      memo: dailyExtraMemo.value.trim(),
+      link: dailyExtraLink.value.trim(),
       category: dailyCategoryInput.value || null,
       frequency,
       weekday,
@@ -2156,6 +2244,7 @@
     dailyInput.value = '';
     dailyTimeInput.value = '';
     dailyCategoryInput.value = '';
+    collapseExtraPanel(dailyExtraToggleBtn, dailyExtraPanel, dailyExtraMemo, dailyExtraLink);
     dailyInput.focus();
     renderDaily();
     renderDailyTemplateList();
@@ -2275,6 +2364,7 @@
   dailyInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addDailyTemplate();
   });
+  bindExtraToggle(dailyExtraToggleBtn, dailyExtraPanel);
 
   function weekdayOptionsHtml() {
     return WEEKDAY_LABELS.map((label, idx) => `<option value="${idx}">${label}</option>`).join('');
@@ -2415,7 +2505,8 @@
     events.push({
       id: crypto.randomUUID(),
       text,
-      memo: '',
+      memo: calExtraMemo.value.trim(),
+      link: calExtraLink.value.trim(),
       category: calCategoryInput.value || null,
       date,
       createdAt: new Date().toISOString(),
@@ -2423,6 +2514,7 @@
     saveCalendarEvents(events);
     calTextInput.value = '';
     calCategoryInput.value = '';
+    collapseExtraPanel(calExtraToggleBtn, calExtraPanel, calExtraMemo, calExtraLink);
     renderCalendar();
     renderTodos();
   }
@@ -2616,6 +2708,7 @@
   calTextInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addCalendarEvent();
   });
+  bindExtraToggle(calExtraToggleBtn, calExtraPanel);
   document.addEventListener('click', (e) => {
     if (e.target.closest('.calendar-day')) return;
     if (openCalendarDate !== null) {
